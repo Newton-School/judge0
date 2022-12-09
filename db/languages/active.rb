@@ -363,5 +363,12 @@
     is_archived: false,
     source_file: "script.py",
     run_cmd: "/usr/local/python-3.10.4/bin/python3 script.py"
-  }
+  },
+  {
+    id: 2001,
+    name: "JavaScript (Node.js 18.12.1)",
+    is_archived: false,
+    source_file: "script.js",
+    run_cmd: "/usr/local/node-18.12.1.0/bin/node script.js"
+  },
 ]
