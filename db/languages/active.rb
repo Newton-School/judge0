@@ -370,5 +370,5 @@
     is_archived: false,
     source_file: "script.js",
     run_cmd: "/usr/local/node-18.12.1.0/bin/node script.js"
-  },
+  }
 ]
