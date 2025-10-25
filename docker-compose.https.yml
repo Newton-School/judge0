@@ -46,6 +46,7 @@ services:
       - LETSENCRYPT_HOST=subdomain.yourdomain.tld
     volumes:
       - ./judge0.conf:/judge0.conf:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     privileged: true
     <<: *default-logging
     restart: always
@@ -55,6 +56,7 @@ services:
     command: ["./scripts/workers"]
     volumes:
       - ./judge0.conf:/judge0.conf:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     privileged: true
     <<: *default-logging
     restart: always

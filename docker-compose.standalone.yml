@@ -28,6 +28,8 @@ services:
       <<: *config
       <<: *db
       <<: *redis
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     ports:
       - "2358:2358"
     privileged: true
@@ -41,6 +43,8 @@ services:
       <<: *config
       <<: *db
       <<: *redis
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     privileged: true
     <<: *logging
     restart: always

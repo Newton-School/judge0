@@ -12,6 +12,7 @@ services:
     image: judge0/judge0:latest
     volumes:
       - ./judge0.conf:/judge0.conf:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     ports:
       - "2358:2358"
     privileged: true
