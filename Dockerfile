@@ -12,6 +12,10 @@ LABEL maintainer=$JUDGE0_MAINTAINER
 ENV PATH "/usr/local/ruby-2.7.0/bin:/opt/.gem/bin:$PATH"
 ENV GEM_HOME "/opt/.gem/"
 
+RUN sed -i 's|deb.debian.org/debian|archive.debian.org/debian|g; \
+            s|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
+
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       cron \
