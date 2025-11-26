@@ -383,6 +383,6 @@
     name: "Jack",
     is_archived: false,
     source_file: "Main.jack",
-    run_cmd: "nand2tetris run Main.jack"
+    run_cmd: "nand2tetris run Main.tst"
   }
 ]
