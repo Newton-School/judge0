@@ -280,10 +280,10 @@
   },
   {
     id: 80,
-    name: "R (4.0.0)",
+    name: "R (4.5.2)",
     is_archived: false,
     source_file: "script.r",
-    run_cmd: "/usr/local/r-4.0.0/bin/Rscript script.r"
+    run_cmd: "/usr/local/r-4.5.2/bin/Rscript script.r"
   },
   {
     id: 81,
