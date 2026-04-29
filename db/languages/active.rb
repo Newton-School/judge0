@@ -156,16 +156,13 @@
     compile_cmd: "/usr/local/ghc-9.10.1/bin/ghc -dynamic %s main.hs",
     run_cmd: "./main"
   },
-  # JVM-based languages get -XX:ActiveProcessorCount=2 so the JVM sizes
-  # its GC / JIT / fork-join thread pools to the sandbox, not the host
-  # nproc — otherwise pthread_create EAGAIN inside the sandbox.
   {
     id: 62,
     name: "Java (OpenJDK 21)",
     is_archived: false,
     source_file: "Main.java",
     compile_cmd: "/usr/local/openjdk-21/bin/javac %s Main.java",
-    run_cmd: "/usr/local/openjdk-21/bin/java -XX:ActiveProcessorCount=2 Main"
+    run_cmd: "/usr/local/openjdk-21/bin/java Main"
   },
   {
     id: 64,
@@ -268,13 +265,19 @@
     compile_cmd: "/usr/local/gnucobol-3.2/bin/cobc -free -x %s main.cob",
     run_cmd: "LD_LIBRARY_PATH=/usr/local/gnucobol-3.2/lib ./main"
   },
+  # JVM-based languages: JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=1 is
+  # injected globally by IsolateJob so the JVM right-sizes thread pools
+  # to the sandbox. Older revisions of this file had per-language
+  # JAVA_OPTS prefixes; those have been removed because some launchers
+  # (kotlin, scala) silently ignore JAVA_OPTS, while JAVA_TOOL_OPTIONS
+  # is read by the JVM itself.
   {
     id: 78,
     name: "Kotlin (2.1.0)",
     is_archived: false,
     source_file: "Main.kt",
     compile_cmd: "/usr/local/kotlin-2.1.0/bin/kotlinc %s Main.kt",
-    run_cmd: "JAVA_OPTS='-XX:ActiveProcessorCount=2' /usr/local/kotlin-2.1.0/bin/kotlin MainKt"
+    run_cmd: "/usr/local/kotlin-2.1.0/bin/kotlin MainKt"
   },
   {
     id: 79,
@@ -291,13 +294,17 @@
     source_file: "script.r",
     run_cmd: "/usr/local/r-4.5.2/bin/Rscript script.r"
   },
+  # Scala 3's `scala` launcher is scala-cli with subcommands (`scala run`,
+  # `scala compile`, etc.) — `scala Main` is no longer valid. Run the
+  # compiled class via the Java launcher with the Scala 3 runtime libs
+  # on the classpath. Faster than scala-cli too.
   {
     id: 81,
     name: "Scala 3 (3.6.2)",
     is_archived: false,
     source_file: "Main.scala",
     compile_cmd: "/usr/local/scala-3.6.2/bin/scalac %s Main.scala",
-    run_cmd: "JAVA_OPTS='-XX:ActiveProcessorCount=2' /usr/local/scala-3.6.2/bin/scala Main"
+    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/scala-3.6.2/lib/*\" Main"
   },
   {
     id: 82,
@@ -322,13 +329,17 @@
     source_file: "script.pl",
     run_cmd: "/usr/bin/perl script.pl"
   },
+  # Clojure 1.12's clojure-tools jar does not have a Main-Class manifest
+  # attribute (1.10.x did). Invoke clojure.main as the entry point on
+  # the classpath instead of `java -jar`.
   {
     id: 86,
     name: "Clojure (1.12)",
     is_archived: false,
     source_file: "main.clj",
-    run_cmd: "/usr/local/bin/java -XX:ActiveProcessorCount=2 -jar /usr/local/clojure-1.12.0.1495/clojure.jar main.clj"
+    run_cmd: "/usr/local/bin/java -cp /usr/local/clojure-1.12.0.1495/clojure.jar clojure.main main.clj"
   },
+  # F# id 87: see C# id 51 for DOTNET_ROOT rationale.
   {
     id: 87,
     name: "F# (.NET 8)",
@@ -341,8 +352,8 @@
     name: "Groovy (4.0.24)",
     is_archived: false,
     source_file: "script.groovy",
-    compile_cmd: "JAVA_OPTS='-XX:ActiveProcessorCount=2' /usr/local/groovy-4.0.24/bin/groovyc %s script.groovy",
-    run_cmd: "/usr/local/bin/java -XX:ActiveProcessorCount=2 -cp \".:/usr/local/groovy-4.0.24/lib/*\" script"
+    compile_cmd: "/usr/local/groovy-4.0.24/bin/groovyc %s script.groovy",
+    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/groovy-4.0.24/lib/*\" script"
   },
   {
     id: 89,
@@ -393,7 +404,7 @@
     name: "MIPS (Mars 4.5)",
     is_archived: false,
     source_file: "main.s",
-    run_cmd: "/usr/local/bin/java -XX:ActiveProcessorCount=2 -Djava.util.logging.config.file=/usr/local/mars/logging.properties -jar /usr/local/mars/mars.jar nc main.s"
+    run_cmd: "/usr/local/bin/java -Djava.util.logging.config.file=/usr/local/mars/logging.properties -jar /usr/local/mars/mars.jar nc main.s"
   },
   {
     id: 3002,

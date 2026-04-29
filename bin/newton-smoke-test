@@ -103,7 +103,7 @@ SRC_JAVA='public class Main {
 
 SRC_KOTLIN='fun main() { println("Hello, Newton!") }'
 
-SRC_SCALA='@main def hello() = println("Hello, Newton!")'
+SRC_SCALA='object Main { def main(args: Array[String]): Unit = println("Hello, Newton!") }'
 
 SRC_GROOVY="println 'Hello, Newton!'"
 
