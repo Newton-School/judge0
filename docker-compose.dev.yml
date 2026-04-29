@@ -11,7 +11,11 @@ services:
     restart: always
 
   judge0:
-    image: newtonschool/newton-judge0:0.32
+    # Built from NewtonDockerfile. Build locally before bringing the stack up:
+    #   docker buildx build --platform linux/arm64 \
+    #       -f NewtonDockerfile -t newtonschool/newton-judge0:0.33 --load .
+    # (use --platform linux/amd64 on EC2 / prod build hosts)
+    image: newtonschool/newton-judge0:0.33
     environment:
       VIRTUAL_HOST: judge0.local
     volumes:

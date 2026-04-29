@@ -327,5 +327,25 @@
     is_archived: false,
     source_file: "script.js",
     run_cmd: "/usr/local/node-12.14.0/bin/node script.js"
+  },
+  # Archived in 0.26 (Phase 2): Python 2 reached end-of-life on 2020-01-01;
+  # the modern compilers image no longer ships /usr/local/python-2.7.17.
+  {
+    id: 70,
+    name: "Python (2.7.17)",
+    is_archived: true,
+    source_file: "script.py",
+    run_cmd: "/usr/local/python-2.7.17/bin/python2 script.py"
+  },
+  # Archived in 0.26 (Phase 2): Mono dropped from compilers image, so the
+  # vbnc-based VB.Net path is no longer available. .NET 8 vbc is not a
+  # drop-in equivalent for the legacy student-submission flow.
+  {
+    id: 84,
+    name: "Visual Basic.Net (vbnc 0.0.0.5943)",
+    is_archived: true,
+    source_file: "Main.vb",
+    compile_cmd: "/usr/bin/vbnc %s Main.vb",
+    run_cmd: "/usr/bin/mono Main.exe"
   }
 ]

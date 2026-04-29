@@ -17,33 +17,39 @@
   },
   {
     id: 45,
-    name: "Assembly (NASM 2.14.02)",
+    name: "Assembly (NASM 2.16.03)",
     is_archived: false,
     source_file: "main.asm",
-    compile_cmd: "/usr/local/nasm-2.14.02/bin/nasmld -f elf64 %s main.asm",
+    compile_cmd: "/usr/local/nasm-2.16.03/bin/nasmld -f elf64 %s main.asm",
     run_cmd: "./a.out"
   },
   {
     id: 46,
-    name: "Bash (5.0.0)",
+    name: "Bash (5.2.37)",
     is_archived: false,
     source_file: "script.sh",
-    run_cmd: "/usr/local/bash-5.0/bin/bash script.sh"
+    run_cmd: "/usr/local/bash-5.2.37/bin/bash script.sh"
   },
   {
     id: 47,
-    name: "Basic (FBC 1.07.1)",
+    name: "Basic (FBC 1.10.1)",
     is_archived: false,
     source_file: "main.bas",
-    compile_cmd: "/usr/local/fbc-1.07.1/bin/fbc %s main.bas",
+    compile_cmd: "/usr/local/fbc-1.10.1/bin/fbc %s main.bas",
     run_cmd: "./main"
   },
+  # IDs 48/49/50 retained for backward-compat with legacy submissions; all
+  # three alias to GCC 9.5.0 (the frozen legacy compiler kept in the
+  # compilers image alongside GCC 14). New submissions should prefer
+  # id 1001 (C / GCC 14.2.0). Lenient flags soften GCC-9-vs-GCC-14
+  # warning-promoted-to-error breakage where a student's old code is
+  # eventually re-run on the modern compiler.
   {
     id: 48,
     name: "C (GCC 7.4.0)",
     is_archived: false,
     source_file: "main.c",
-    compile_cmd: "/usr/local/gcc-7.4.0/bin/gcc %s main.c",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
     run_cmd: "./a.out"
   },
   {
@@ -51,231 +57,225 @@
     name: "C (GCC 8.3.0)",
     is_archived: false,
     source_file: "main.c",
-    compile_cmd: "/usr/local/gcc-8.3.0/bin/gcc %s main.c",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
     run_cmd: "./a.out"
   },
   {
     id: 50,
-    name: "C (GCC 9.2.0)",
+    name: "C (GCC 9.5.0)",
     is_archived: false,
     source_file: "main.c",
-    compile_cmd: "/usr/local/gcc-9.2.0/bin/gcc %s main.c",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
     run_cmd: "./a.out"
   },
+  # C# moved from Mono to .NET 8 via dotnet-script (single-file scripting)
   {
     id: 51,
-    name: "C# (Mono 6.6.0.161)",
+    name: "C# (.NET 8)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "/usr/local/mono-6.6.0.161/bin/mcs %s Main.cs",
-    run_cmd: "/usr/local/mono-6.6.0.161/bin/mono Main.exe"
+    run_cmd: "/usr/local/dotnet-tools/dotnet-script Main.cs"
   },
   {
     id: 52,
     name: "C++ (GCC 7.4.0)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/local/gcc-7.4.0/bin/g++ %s main.cpp",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-7.4.0/lib64 ./a.out"
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
   },
   {
     id: 53,
     name: "C++ (GCC 8.3.0)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/local/gcc-8.3.0/bin/g++ %s main.cpp",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-8.3.0/lib64 ./a.out"
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
   },
   {
     id: 54,
-    name: "C++ (GCC 9.2.0)",
+    name: "C++ (GCC 9.5.0)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/local/gcc-9.2.0/bin/g++ %s main.cpp",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.2.0/lib64 ./a.out"
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
   },
   {
     id: 55,
-    name: "Common Lisp (SBCL 2.0.0)",
+    name: "Common Lisp (SBCL 2.4.10)",
     is_archived: false,
     source_file: "script.lisp",
-    run_cmd: "SBCL_HOME=/usr/local/sbcl-2.0.0/lib/sbcl /usr/local/sbcl-2.0.0/bin/sbcl --script script.lisp"
+    run_cmd: "SBCL_HOME=/usr/local/sbcl-2.4.10/lib/sbcl /usr/local/sbcl-2.4.10/bin/sbcl --script script.lisp"
   },
   {
     id: 56,
-    name: "D (DMD 2.089.1)",
+    name: "D (DMD 2.110.0)",
     is_archived: false,
     source_file: "main.d",
-    compile_cmd: "/usr/local/d-2.089.1/linux/bin64/dmd %s main.d",
+    compile_cmd: "/usr/local/d-2.110.0/linux/bin64/dmd %s main.d",
     run_cmd: "./main"
   },
   {
     id: 57,
-    name: "Elixir (1.9.4)",
+    name: "Elixir (1.17.3)",
     is_archived: false,
     source_file: "script.exs",
-    run_cmd: "/usr/local/elixir-1.9.4/bin/elixir script.exs"
+    run_cmd: "/usr/local/elixir-1.17.3/bin/elixir script.exs"
   },
   {
     id: 58,
-    name: "Erlang (OTP 22.2)",
+    name: "Erlang (OTP 27.1.2)",
     is_archived: false,
     source_file: "main.erl",
-    run_cmd: "/bin/sed -i '1s/^/\\n/' main.erl && /usr/local/erlang-22.2/bin/escript main.erl"
+    run_cmd: "/bin/sed -i '1s/^/\\n/' main.erl && /usr/local/erlang-27.1.2/bin/escript main.erl"
   },
   {
     id: 59,
-    name: "Fortran (GFortran 9.2.0)",
+    name: "Fortran (GFortran 14.2.0)",
     is_archived: false,
     source_file: "main.f90",
-    compile_cmd: "/usr/local/gcc-9.2.0/bin/gfortran %s main.f90",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.2.0/lib64 ./a.out"
+    compile_cmd: "/usr/local/gcc-14.2.0/bin/gfortran -fallow-argument-mismatch %s main.f90",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-14.2.0/lib64 ./a.out"
   },
   {
     id: 60,
-    name: "Go (1.13.5)",
+    name: "Go (1.23.4)",
     is_archived: false,
     source_file: "main.go",
-    compile_cmd: "GOCACHE=/tmp/.cache/go-build /usr/local/go-1.13.5/bin/go build %s main.go",
+    compile_cmd: "GOCACHE=/tmp/.cache/go-build /usr/local/go-1.23.4/bin/go build %s main.go",
     run_cmd: "./main"
   },
   {
     id: 61,
-    name: "Haskell (GHC 8.8.1)",
+    name: "Haskell (GHC 9.10.1)",
     is_archived: false,
     source_file: "main.hs",
-    compile_cmd: "/usr/local/ghc-8.8.1/bin/ghc %s main.hs",
+    compile_cmd: "/usr/local/ghc-9.10.1/bin/ghc -dynamic %s main.hs",
     run_cmd: "./main"
   },
   {
     id: 62,
-    name: "Java (OpenJDK 13.0.1)",
+    name: "Java (OpenJDK 21)",
     is_archived: false,
     source_file: "Main.java",
-    compile_cmd: "/usr/local/openjdk13/bin/javac %s Main.java",
-    run_cmd: "/usr/local/openjdk13/bin/java Main"
+    compile_cmd: "/usr/local/openjdk-21/bin/javac %s Main.java",
+    run_cmd: "/usr/local/openjdk-21/bin/java Main"
   },
   {
     id: 64,
-    name: "Lua (5.3.5)",
+    name: "Lua (5.4.7)",
     is_archived: false,
     source_file: "script.lua",
-    compile_cmd: "/usr/local/lua-5.3.5/luac53 %s script.lua",
-    run_cmd: "/usr/local/lua-5.3.5/lua53 ./luac.out"
+    compile_cmd: "/usr/local/lua-5.4.7/bin/luac %s script.lua",
+    run_cmd: "/usr/local/lua-5.4.7/bin/lua ./luac.out"
   },
   {
     id: 65,
-    name: "OCaml (4.09.0)",
+    name: "OCaml (5.2.0)",
     is_archived: false,
     source_file: "main.ml",
-    compile_cmd: "/usr/local/ocaml-4.09.0/bin/ocamlc %s main.ml",
+    compile_cmd: "/usr/local/ocaml-5.2.0/bin/ocamlc %s main.ml",
     run_cmd: "./a.out"
   },
   {
     id: 66,
-    name: "Octave (5.1.0)",
+    name: "Octave (8.4.0)",
     is_archived: false,
     source_file: "script.m",
-    run_cmd: "/usr/local/octave-5.1.0/bin/octave-cli -q --no-gui --no-history script.m"
+    run_cmd: "/usr/local/octave/bin/octave-cli -q --no-gui --no-history script.m"
   },
   {
     id: 67,
-    name: "Pascal (FPC 3.0.4)",
+    name: "Pascal (FPC 3.2.2)",
     is_archived: false,
     source_file: "main.pas",
-    compile_cmd: "/usr/local/fpc-3.0.4/bin/fpc %s main.pas",
+    compile_cmd: "/usr/local/fpc-3.2.2/bin/fpc %s main.pas",
     run_cmd: "./main"
   },
   {
     id: 68,
-    name: "PHP (7.4.1)",
+    name: "PHP (8.4.1)",
     is_archived: false,
     source_file: "script.php",
-    run_cmd: "/usr/local/php-7.4.1/bin/php script.php"
+    run_cmd: "/usr/local/php-8.4.1/bin/php script.php"
   },
   {
     id: 69,
-    name: "Prolog (GNU Prolog 1.4.5)",
+    name: "Prolog (GNU Prolog 1.5.0)",
     is_archived: false,
     source_file: "main.pro",
-    compile_cmd: "PATH=\"/usr/local/gprolog-1.4.5/gprolog-1.4.5/bin:$PATH\" /usr/local/gprolog-1.4.5/gprolog-1.4.5/bin/gplc --no-top-level %s main.pro",
+    compile_cmd: "PATH=\"/usr/local/gprolog-1.5.0/bin:$PATH\" /usr/local/gprolog-1.5.0/bin/gplc --no-top-level %s main.pro",
     run_cmd: "./main"
   },
-  {
-    id: 70,
-    name: "Python (2.7.17)",
-    is_archived: false,
-    source_file: "script.py",
-    run_cmd: "/usr/local/python-2.7.17/bin/python2 script.py"
-  },
+  # id 70 (Python 2.7.17) moved to archived.rb (Python 2 EOL since 2020)
   {
     id: 71,
-    name: "Python (3.11.4)",
+    name: "Python (3.13.1)",
     is_archived: false,
     source_file: "script.py",
-    run_cmd: "/usr/local/python-3.11.4/bin/python3 script.py"
+    run_cmd: "/usr/local/python-3.13.1/bin/python3 script.py"
   },
   {
     id: 72,
-    name: "Ruby (2.7.0)",
+    name: "Ruby (3.3.6)",
     is_archived: false,
     source_file: "script.rb",
-    run_cmd: "/usr/local/ruby-2.7.0/bin/ruby script.rb"
+    run_cmd: "/usr/local/ruby-3.3.6/bin/ruby script.rb"
   },
   {
     id: 73,
-    name: "Rust (1.40.0)",
+    name: "Rust (1.83.0)",
     is_archived: false,
     source_file: "main.rs",
-    compile_cmd: "/usr/local/rust-1.40.0/bin/rustc %s main.rs",
+    compile_cmd: "/usr/local/rust-1.83.0/bin/rustc %s main.rs",
     run_cmd: "./main"
   },
   {
     id: 74,
-    name: "TypeScript (5.8.3)",
+    name: "TypeScript (5.7.2)",
     is_archived: false,
     source_file: "script.ts",
-    compile_cmd: "/usr/bin/tsc %s script.ts",
-    run_cmd: "/usr/local/node-20.9.0/bin/node script.js"
+    compile_cmd: "/usr/local/node-22.11.0/bin/tsc %s script.ts",
+    run_cmd: "/usr/local/node-22.11.0/bin/node script.js"
   },
   {
     id: 75,
-    name: "C (Clang 7.0.1)",
+    name: "C (Clang 19)",
     is_archived: false,
     source_file: "main.c",
-    compile_cmd: "/usr/bin/clang-7 %s main.c",
+    compile_cmd: "/usr/bin/clang-19 -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
     run_cmd: "./a.out"
   },
   {
     id: 76,
-    name: "C++ (Clang 7.0.1)",
+    name: "C++ (Clang 19)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/bin/clang++-7 %s main.cpp",
+    compile_cmd: "/usr/bin/clang++-19 %s main.cpp",
     run_cmd: "./a.out"
   },
   {
     id: 77,
-    name: "COBOL (GnuCOBOL 2.2)",
+    name: "COBOL (GnuCOBOL 3.2)",
     is_archived: false,
     source_file: "main.cob",
-    compile_cmd: "/usr/local/gnucobol-2.2/bin/cobc -free -x %s main.cob",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gnucobol-2.2/lib ./main"
+    compile_cmd: "/usr/local/gnucobol-3.2/bin/cobc -free -x %s main.cob",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gnucobol-3.2/lib ./main"
   },
   {
     id: 78,
-    name: "Kotlin (1.3.70)",
+    name: "Kotlin (2.1.0)",
     is_archived: false,
     source_file: "Main.kt",
-    compile_cmd: "/usr/local/kotlin-1.3.70/bin/kotlinc %s Main.kt",
-    run_cmd: "/usr/local/kotlin-1.3.70/bin/kotlin MainKt"
+    compile_cmd: "/usr/local/kotlin-2.1.0/bin/kotlinc %s Main.kt",
+    run_cmd: "/usr/local/kotlin-2.1.0/bin/kotlin MainKt"
   },
   {
     id: 79,
-    name: "Objective-C (Clang 7.0.1)",
+    name: "Objective-C (Clang 19)",
     is_archived: false,
     source_file: "main.m",
-    compile_cmd: "/usr/bin/clang-7 `gnustep-config --objc-flags | sed 's/-W[^ ]* //g'` `gnustep-config --base-libs | sed 's/-shared-libgcc//'` -I/usr/lib/gcc/x86_64-linux-gnu/8/include main.m %s",
+    compile_cmd: "/usr/bin/clang-19 `gnustep-config --objc-flags | sed 's/-W[^ ]* //g'` `gnustep-config --base-libs | sed 's/-shared-libgcc//'` main.m %s",
     run_cmd: "./a.out"
   },
   {
@@ -287,82 +287,93 @@
   },
   {
     id: 81,
-    name: "Scala (2.13.2)",
+    name: "Scala 3 (3.6.2)",
     is_archived: false,
     source_file: "Main.scala",
-    compile_cmd: "/usr/local/scala-2.13.2/bin/scalac %s Main.scala",
-    run_cmd: "/usr/local/scala-2.13.2/bin/scala Main"
+    compile_cmd: "/usr/local/scala-3.6.2/bin/scalac %s Main.scala",
+    run_cmd: "/usr/local/scala-3.6.2/bin/scala Main"
   },
   {
     id: 82,
-    name: "SQL (SQLite 3.41.1)",
+    name: "SQL (SQLite 3.47.0)",
     is_archived: false,
     source_file: "script.sql",
-    run_cmd: "/bin/cat script.sql | /usr/local/sqlite-autoconf-3410100/bin/sqlite3 db.sqlite"
+    run_cmd: "/bin/cat script.sql | /usr/local/sqlite-autoconf-3470000/bin/sqlite3 db.sqlite"
   },
   {
     id: 83,
-    name: "Swift (5.2.3)",
+    name: "Swift (6.0.3)",
     is_archived: false,
     source_file: "Main.swift",
-    compile_cmd: "/usr/local/swift-5.2.3/bin/swiftc %s Main.swift",
+    compile_cmd: "/usr/local/swift-6.0.3/bin/swiftc %s Main.swift",
     run_cmd: "./Main"
   },
-  {
-    id: 84,
-    name: "Visual Basic.Net (vbnc 0.0.0.5943)",
-    is_archived: false,
-    source_file: "Main.vb",
-    compile_cmd: "/usr/bin/vbnc %s Main.vb",
-    run_cmd: "/usr/bin/mono Main.exe"
-  },
+  # id 84 (Visual Basic.Net via vbnc/Mono) moved to archived.rb (Mono dropped)
   {
     id: 85,
-    name: "Perl (5.28.1)",
+    name: "Perl (5.36)",
     is_archived: false,
     source_file: "script.pl",
     run_cmd: "/usr/bin/perl script.pl"
   },
   {
     id: 86,
-    name: "Clojure (1.10.1)",
+    name: "Clojure (1.12)",
     is_archived: false,
     source_file: "main.clj",
-    run_cmd: "/usr/local/bin/java -jar /usr/local/clojure-1.10.1/clojure.jar main.clj"
+    run_cmd: "/usr/local/bin/java -jar /usr/local/clojure-1.12.0.1495/clojure.jar main.clj"
   },
   {
     id: 87,
-    name: "F# (.NET Core SDK 3.1.202)",
+    name: "F# (.NET 8)",
     is_archived: false,
     source_file: "script.fsx",
-    run_cmd: "mkdir -p ~/.dotnet && touch ~/.dotnet/3.1.202.dotnetFirstUseSentinel && /usr/local/dotnet-sdk/dotnet fsi script.fsx"
+    run_cmd: "/usr/local/dotnet-sdk/dotnet fsi script.fsx"
   },
   {
     id: 88,
-    name: "Groovy (3.0.3)",
+    name: "Groovy (4.0.24)",
     is_archived: false,
     source_file: "script.groovy",
-    compile_cmd: "/usr/local/groovy-3.0.3/bin/groovyc %s script.groovy",
-    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/groovy-3.0.3/lib/*\" script"
+    compile_cmd: "/usr/local/groovy-4.0.24/bin/groovyc %s script.groovy",
+    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/groovy-4.0.24/lib/*\" script"
   },
   {
     id: 89,
     name: "Multi-file program",
     is_archived: false,
   },
+  # New IDs for current GCC 14 — same lenient flags so new student code is
+  # tolerant of legacy idioms while new submissions get the modern compiler.
+  {
+    id: 1001,
+    name: "C (GCC 14.2.0)",
+    is_archived: false,
+    source_file: "main.c",
+    compile_cmd: "/usr/local/gcc-14.2.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
+    run_cmd: "./a.out"
+  },
+  {
+    id: 1002,
+    name: "C++ (GCC 14.2.0)",
+    is_archived: false,
+    source_file: "main.cpp",
+    compile_cmd: "/usr/local/gcc-14.2.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-14.2.0/lib64 ./a.out"
+  },
   {
     id: 1999,
-    name: "JavaScript (Node.js 20.9.0)",
+    name: "JavaScript (Node.js 22.11.0)",
     is_archived: false,
     source_file: "script.js",
-    run_cmd: "NODE_PATH='/usr/local/node-20.9.0/lib/node_modules' /usr/local/node-20.9.0/bin/node script.js"
+    run_cmd: "NODE_PATH='/usr/local/node-22.11.0/lib/node_modules' /usr/local/node-22.11.0/bin/node script.js"
   },
   {
     id: 2000,
-    name: "Python (3.10.4) for ML",
+    name: "Python (3.12.7) for ML",
     is_archived: false,
     source_file: "script.py",
-    run_cmd: "/usr/local/python-3.10.4/bin/python3 script.py"
+    run_cmd: "/usr/local/python-3.12.7/bin/python3 script.py"
   },
   {
     id: 3000,
