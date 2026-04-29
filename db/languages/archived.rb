@@ -337,6 +337,44 @@
     source_file: "script.py",
     run_cmd: "/usr/local/python-2.7.17/bin/python2 script.py"
   },
+  # Archived in 0.57: ids 48 (C / GCC 7.4) and 49 (C / GCC 8.3) were aliases
+  # for GCC 9.5.0 — keeping them as separate dropdown entries was misleading
+  # since they all produced the same binary. Students who specifically need
+  # GCC 9.5 should pick id 50; modern code should pick id 1001 (GCC 14).
+  {
+    id: 48,
+    name: "C (GCC 7.4.0)",
+    is_archived: true,
+    source_file: "main.c",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
+    run_cmd: "./a.out"
+  },
+  {
+    id: 49,
+    name: "C (GCC 8.3.0)",
+    is_archived: true,
+    source_file: "main.c",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
+    run_cmd: "./a.out"
+  },
+  # Archived in 0.57: ids 52 (C++ / GCC 7.4) and 53 (C++ / GCC 8.3), same
+  # reason as 48/49. Use id 54 (GCC 9.5) or id 1002 (GCC 14) instead.
+  {
+    id: 52,
+    name: "C++ (GCC 7.4.0)",
+    is_archived: true,
+    source_file: "main.cpp",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
+  },
+  {
+    id: 53,
+    name: "C++ (GCC 8.3.0)",
+    is_archived: true,
+    source_file: "main.cpp",
+    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
+  },
   # Archived in 0.26 (Phase 2): Mono dropped from compilers image, so the
   # vbnc-based VB.Net path is no longer available. .NET 8 vbc is not a
   # drop-in equivalent for the legacy student-submission flow.

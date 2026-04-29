@@ -200,26 +200,6 @@
       "name": "C / C++ / Fortran / Obj-C",
       "item": [
         {
-          "name": "C GCC 7.4 → 9.5 (48)",
-          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 48,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
-          }
-        },
-        {
-          "name": "C GCC 8.3 → 9.5 (49)",
-          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 49,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
-          }
-        },
-        {
           "name": "C GCC 9.5 (50)",
           "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
           "request": {
@@ -247,26 +227,6 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
             "body": {"mode": "raw", "raw": "{\n  \"language_id\": 75,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
-          }
-        },
-        {
-          "name": "C++ GCC 7.4 → 9.5 (52)",
-          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 52,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
-          }
-        },
-        {
-          "name": "C++ GCC 8.3 → 9.5 (53)",
-          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 53,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
           }
         },
         {
@@ -377,9 +337,45 @@
       ]
     },
     {
-      "name": ".NET (archived in 0.57)",
-      "description": "C# (51) and F# (87) are archived because .NET CoreCLR is incompatible with isolate's rlimit-mode resource limits (RLIMIT_AS breaks GC heap init; RLIMIT_FSIZE triggers SIGXFSZ on JIT writes). Will be revived once isolate cgroup-mode lands. The requests are kept here so prod can re-test once unarchived.",
+      "name": "Archived in 0.57",
+      "description": "Languages archived in 0.57. Submitting any of these returns a 422 with 'language is archived'.\n\n- C# (51) and F# (87): .NET CoreCLR is incompatible with isolate's rlimit-mode (RLIMIT_AS breaks GC heap init; RLIMIT_FSIZE triggers SIGXFSZ on JIT writes). Revives once cgroup-mode lands.\n- C/C++ GCC 7.4 (48, 52) and 8.3 (49, 53): all four were aliases that compiled with GCC 9.5.0 anyway. Use id 50 (C / GCC 9.5) or 1001 (C / GCC 14) and id 54 (C++ / GCC 9.5) or 1002 (C++ / GCC 14).",
       "item": [
+        {
+          "name": "C GCC 7.4 (48) — archived",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 48,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
+          }
+        },
+        {
+          "name": "C GCC 8.3 (49) — archived",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 49,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
+          }
+        },
+        {
+          "name": "C++ GCC 7.4 (52) — archived",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 52,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
+          }
+        },
+        {
+          "name": "C++ GCC 8.3 (53) — archived",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 53,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
+          }
+        },
         {
           "name": "C# .NET 8 (51) — archived",
           "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],

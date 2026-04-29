@@ -38,28 +38,16 @@
     compile_cmd: "/usr/local/fbc-1.10.1/bin/fbc %s main.bas",
     run_cmd: "./main"
   },
-  # IDs 48/49/50 retained for backward-compat with legacy submissions; all
-  # three alias to GCC 9.5.0 (the frozen legacy compiler kept in the
-  # compilers image alongside GCC 14). New submissions should prefer
-  # id 1001 (C / GCC 14.2.0). Lenient flags soften GCC-9-vs-GCC-14
-  # warning-promoted-to-error breakage where a student's old code is
-  # eventually re-run on the modern compiler.
-  {
-    id: 48,
-    name: "C (GCC 7.4.0)",
-    is_archived: false,
-    source_file: "main.c",
-    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
-    run_cmd: "./a.out"
-  },
-  {
-    id: 49,
-    name: "C (GCC 8.3.0)",
-    is_archived: false,
-    source_file: "main.c",
-    compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
-    run_cmd: "./a.out"
-  },
+  # ids 48 (C / GCC 7.4) and 49 (C / GCC 8.3) moved to archived.rb in 0.57:
+  # both were aliasing to GCC 9.5.0 anyway, which made the dropdown choice
+  # misleading. Students who actually need a pre-9.5 compiler aren't served
+  # by an alias, and students who don't need it should pick id 50 (GCC 9.5)
+  # or id 1001 (GCC 14) explicitly.
+  #
+  # id 50 (C / GCC 9.5.0) is the legacy compiler kept in the image alongside
+  # GCC 14. New submissions should prefer id 1001 (C / GCC 14.2.0). Lenient
+  # flags soften GCC-9-vs-GCC-14 warning-promoted-to-error breakage where a
+  # student's old code is eventually re-run on the modern compiler.
   {
     id: 50,
     name: "C (GCC 9.5.0)",
@@ -69,23 +57,9 @@
     run_cmd: "./a.out"
   },
   # id 51 (C# .NET 8) moved to archived.rb until isolate cgroup-mode lands.
+  # ids 52 (C++ / GCC 7.4) and 53 (C++ / GCC 8.3) also archived in 0.57 —
+  # same reason as 48/49: both were aliasing to GCC 9.5.0 anyway.
   # See archived.rb for context.
-  {
-    id: 52,
-    name: "C++ (GCC 7.4.0)",
-    is_archived: false,
-    source_file: "main.cpp",
-    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
-  },
-  {
-    id: 53,
-    name: "C++ (GCC 8.3.0)",
-    is_archived: false,
-    source_file: "main.cpp",
-    compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
-  },
   {
     id: 54,
     name: "C++ (GCC 9.5.0)",
