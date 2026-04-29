@@ -82,30 +82,11 @@ RUN echo "gem: --no-document" > /root/.gemrc && \
 ENV VIRTUAL_PORT 2358
 EXPOSE $VIRTUAL_PORT
 
-# C# language id 51 runs single-file scripts via dotnet-script.
-RUN dotnet tool install --tool-path /usr/local/dotnet-tools dotnet-script
-
-# Pre-warm dotnet-script's NuGet + script cache during image build, so a
-# sandboxed first run doesn't have to materialise ~200 MB of NuGet refs
-# at submission time (which exceeds RLIMIT_FSIZE / takes long enough to
-# blow CPU_TIME_LIMIT). The cache lands at /usr/local/share/dotnet-script-cache; the
-# active.rb run_cmd points NUGET_PACKAGES + HOME at it for read access.
-RUN set -eux; \
-    mkdir -p /usr/local/share/dotnet-script-cache; \
-    cd /tmp && echo 'System.Console.WriteLine("warm");' > warm.cs; \
-    HOME=/usr/local/share/dotnet-script-cache \
-    DOTNET_ROOT=/usr/local/dotnet-sdk \
-    /usr/local/dotnet-tools/dotnet-script /tmp/warm.cs >/dev/null; \
-    rm -f /tmp/warm.cs; \
-    chmod -R a+rX /usr/local/share/dotnet-script-cache
-
-# Normalise architecture-divergent install paths so db/languages/active.rb
-# can use a single canonical path on both arm64 (dev) and amd64 (prod).
-# On arm64 some languages fall back to apt versions in the compilers image.
-RUN set -eux; \
-    [ -e /usr/local/sbcl-2.4.10 ] || ln -sfn "$(ls -d /usr/local/sbcl-* | head -1)" /usr/local/sbcl-2.4.10; \
-    [ -e /usr/local/fpc-3.2.2 ]   || ln -sfn "$(ls -d /usr/local/fpc-*   | head -1)" /usr/local/fpc-3.2.2;   \
-    [ -e /usr/local/d-2.110.0 ]   || ln -sfn "$(ls -d /usr/local/d-*     | head -1)" /usr/local/d-2.110.0
+# (Compiler image 0.27 dropped .NET / SBCL / FPC / DMD; the dotnet-script
+# install + pre-warm + arch-divergent path symlinks that lived here are
+# gone with them. C# (51) and F# (87) remain in archived.rb and are gated
+# behind a future isolate cgroup-mode revival; SBCL/Pascal/D were archived
+# in 0.59 for low prod usage.)
 
 WORKDIR /api
 

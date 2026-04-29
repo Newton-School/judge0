@@ -36,14 +36,6 @@ if ! command -v jq >/dev/null; then
     echo "ERROR: jq is required (brew install jq / apt-get install jq)" >&2
     exit 2
 fi
-if ! command -v base64 >/dev/null; then
-    echo "ERROR: base64 is required" >&2
-    exit 2
-fi
-if ! command -v python3 >/dev/null; then
-    echo "ERROR: python3 is required (used to build the multi-file zip)" >&2
-    exit 2
-fi
 
 echo "Submitting against ${URL} (arch=${ARCH})"
 echo
@@ -57,43 +49,6 @@ t() {
         '{language_id:$lid, source_code:$sc}')"
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
         -H 'Content-Type: application/json' -d "$payload")"
-    _check_resp "$name" "$lid" "$expected" "$resp"
-}
-
-# t_b64 <name> <language_id> <source_code_base64> [<expected_substring>]
-# Submits source_code as base64 (binary or otherwise non-UTF-8 payloads).
-t_b64() {
-    local name="$1" lid="$2" b64="$3"
-    local expected="${4:-$EXPECTED}"
-    local payload resp
-    payload="$(jq -nc --arg sc "$b64" --argjson lid "$lid" \
-        '{language_id:$lid, source_code:$sc}')"
-    resp="$(curl -s -X POST "${URL}/submissions?wait=true&base64_encoded=true&fields=stdout,stderr,status,message,compile_output" \
-        -H 'Content-Type: application/json' -d "$payload")"
-    # base64_encoded=true returns stdout as base64 too — decode for comparison
-    local stdout_b64 stdout
-    stdout_b64="$(echo "$resp" | jq -r '.stdout // ""')"
-    stdout="$(echo "$stdout_b64" | base64 --decode 2>/dev/null || echo "")"
-    resp="$(echo "$resp" | jq --arg s "$stdout" '.stdout = $s')"
-    _check_resp "$name" "$lid" "$expected" "$resp"
-}
-
-# t_proj <name> <language_id> <files_base64_zip> [<expected_substring>]
-# Submits a Multi-file project: source_code is empty, additional_files
-# is a base64 zip with a `run` (and optional `compile`) script plus
-# whatever sources the project needs.
-t_proj() {
-    local name="$1" lid="$2" zip_b64="$3"
-    local expected="${4:-$EXPECTED}"
-    local payload resp
-    payload="$(jq -nc --arg af "$zip_b64" --argjson lid "$lid" \
-        '{language_id:$lid, additional_files:$af}')"
-    resp="$(curl -s -X POST "${URL}/submissions?wait=true&base64_encoded=true&fields=stdout,stderr,status,message,compile_output" \
-        -H 'Content-Type: application/json' -d "$payload")"
-    local stdout_b64 stdout
-    stdout_b64="$(echo "$resp" | jq -r '.stdout // ""')"
-    stdout="$(echo "$stdout_b64" | base64 --decode 2>/dev/null || echo "")"
-    resp="$(echo "$resp" | jq --arg s "$stdout" '.stdout = $s')"
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
@@ -127,10 +82,8 @@ skip() {
 section() { printf "\n\033[1m== %s ==\033[0m\n" "$1"; }
 
 # ────────────────────────────────────────────────────────────────────────
-# Reusable source snippets
+# Source snippets — one per active language.
 # ────────────────────────────────────────────────────────────────────────
-SRC_PLAIN="$EXPECTED"
-
 SRC_BASH='echo "Hello, Newton!"'
 
 SRC_C='#include <stdio.h>
@@ -139,26 +92,11 @@ int main(void) { printf("Hello, Newton!\n"); return 0; }'
 SRC_CPP='#include <iostream>
 int main() { std::cout << "Hello, Newton!" << std::endl; return 0; }'
 
-SRC_FORTRAN='program hello
-  print *, "Hello, Newton!"
-end program hello'
-
-SRC_OBJC='#include <stdio.h>
-int main(int argc, const char *argv[]) { printf("Hello, Newton!\n"); return 0; }'
-
 SRC_JAVA='public class Main {
     public static void main(String[] a) {
         System.out.println("Hello, Newton!");
     }
 }'
-
-SRC_KOTLIN='fun main() { println("Hello, Newton!") }'
-
-SRC_SCALA='object Main { def main(args: Array[String]): Unit = println("Hello, Newton!") }'
-
-SRC_GROOVY="println 'Hello, Newton!'"
-
-SRC_CLOJURE='(println "Hello, Newton!")'
 
 SRC_GO='package main
 import "fmt"
@@ -166,39 +104,7 @@ func main() { fmt.Println("Hello, Newton!") }'
 
 SRC_RUST='fn main() { println!("Hello, Newton!"); }'
 
-SRC_SWIFT='print("Hello, Newton!")'
-
-SRC_HASKELL='main = putStrLn "Hello, Newton!"'
-
-SRC_OCAML='let () = print_endline "Hello, Newton!"'
-
-# Erlang escript needs an empty first line (active.rb's sed prepends one,
-# so we keep the source flush-left here).
-SRC_ERLANG='main(_) -> io:format("Hello, Newton!~n").'
-
-SRC_ELIXIR='IO.puts("Hello, Newton!")'
-
 SRC_R='cat("Hello, Newton!\n")'
-
-SRC_LUA='print("Hello, Newton!")'
-
-SRC_OCTAVE="disp('Hello, Newton!')"
-
-SRC_PASCAL=$(cat <<'PEOF'
-program hello;
-begin
-  writeln('Hello, Newton!');
-end.
-PEOF
-)
-
-SRC_PHP='<?php echo "Hello, Newton!\n";'
-
-SRC_PROLOG=$(cat <<'PEOF'
-:- initialization(main).
-main :- write('Hello, Newton!'), nl.
-PEOF
-)
 
 SRC_PYTHON='print("Hello, Newton!")'
 
@@ -210,24 +116,7 @@ SRC_RUBY='puts "Hello, Newton!"'
 
 SRC_TS='console.log("Hello, Newton!");'
 
-SRC_PERL='print "Hello, Newton!\n";'
-
-SRC_CSHARP='System.Console.WriteLine("Hello, Newton!");'
-
-SRC_FSHARP='printfn "Hello, Newton!"'
-
 SRC_NODE='console.log("Hello, Newton!")'
-
-SRC_SBCL='(format t "Hello, Newton!~%")'
-
-SRC_D='import std.stdio;
-void main() { writeln("Hello, Newton!"); }'
-
-SRC_COBOL='       IDENTIFICATION DIVISION.
-       PROGRAM-ID. Hello.
-       PROCEDURE DIVISION.
-           DISPLAY "Hello, Newton!".
-           STOP RUN.'
 
 SRC_SQL="SELECT 'Hello, Newton!';"
 
@@ -327,44 +216,9 @@ t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
 skip "HDL Nand2Tetris (3000)"   "nand2tetris CLI is a simulator/REPL — needs stdin or a .tst test file, not stdout-based"
 skip "Jack (3002)"              "compiles to nand2tetris VM with screen output — not stdout-based"
 
-# ────────────────────────────────────────────────────────────────────────
-section "Archived (toolchains removed in 0.27)"
-# ────────────────────────────────────────────────────────────────────────
-ARCHIVED_REASON_GCC="archived in 0.57: was an alias to GCC 9.5; use id 50/54 or 1001/1002"
-ARCHIVED_REASON_DOTNET="archived in 0.33: needs isolate cgroup-mode (.NET CoreCLR incompatible with rlimit-mode -m / -f)"
-ARCHIVED_REASON_LOW_USAGE="archived in 0.59 (low prod usage): toolchain removed from compilers:0.27"
-
-skip "Plain Text (43)"          "$ARCHIVED_REASON_LOW_USAGE"
-skip "Executable (44)"          "$ARCHIVED_REASON_LOW_USAGE"
-skip "C GCC 7.4 (48)"           "$ARCHIVED_REASON_GCC"
-skip "C GCC 8.3 (49)"           "$ARCHIVED_REASON_GCC"
-skip "C# .NET 8 (51)"           "$ARCHIVED_REASON_DOTNET"
-skip "C++ GCC 7.4 (52)"         "$ARCHIVED_REASON_GCC"
-skip "C++ GCC 8.3 (53)"         "$ARCHIVED_REASON_GCC"
-skip "SBCL 2.4.10 (55)"         "$ARCHIVED_REASON_LOW_USAGE"
-skip "D DMD 2.110.0 (56)"       "$ARCHIVED_REASON_LOW_USAGE"
-skip "Elixir 1.17.3 (57)"       "$ARCHIVED_REASON_LOW_USAGE"
-skip "Erlang OTP 27 (58)"       "$ARCHIVED_REASON_LOW_USAGE"
-skip "Fortran gfortran 14 (59)" "$ARCHIVED_REASON_LOW_USAGE"
-skip "Haskell GHC 9.10.1 (61)"  "$ARCHIVED_REASON_LOW_USAGE"
-skip "Lua 5.4.7 (64)"           "$ARCHIVED_REASON_LOW_USAGE"
-skip "OCaml 5.2.0 (65)"         "$ARCHIVED_REASON_LOW_USAGE"
-skip "Octave 8.4.0 (66)"        "$ARCHIVED_REASON_LOW_USAGE"
-skip "Pascal FPC 3.2.2 (67)"    "$ARCHIVED_REASON_LOW_USAGE"
-skip "PHP 8.4.1 (68)"           "$ARCHIVED_REASON_LOW_USAGE"
-skip "GNU Prolog 1.5.0 (69)"    "$ARCHIVED_REASON_LOW_USAGE"
-skip "C Clang 19 (75)"          "$ARCHIVED_REASON_LOW_USAGE"
-skip "C++ Clang 19 (76)"        "$ARCHIVED_REASON_LOW_USAGE"
-skip "GnuCOBOL 3.2 (77)"        "$ARCHIVED_REASON_LOW_USAGE"
-skip "Kotlin 2.1.0 (78)"        "$ARCHIVED_REASON_LOW_USAGE"
-skip "Objective-C Clang 19 (79)" "$ARCHIVED_REASON_LOW_USAGE"
-skip "Scala 3.6.2 (81)"         "$ARCHIVED_REASON_LOW_USAGE"
-skip "Swift 6.0.3 (83)"         "$ARCHIVED_REASON_LOW_USAGE"
-skip "Perl 5.36 (85)"           "$ARCHIVED_REASON_LOW_USAGE"
-skip "Clojure 1.12 (86)"        "$ARCHIVED_REASON_LOW_USAGE"
-skip "F# .NET 8 (87)"           "$ARCHIVED_REASON_DOTNET"
-skip "Groovy 4.0.24 (88)"       "$ARCHIVED_REASON_LOW_USAGE"
-skip "Multi-file program (89)"  "$ARCHIVED_REASON_LOW_USAGE"
+# Archived languages are intentionally not tested here — the smoke test
+# verifies the *currently active* surface. See db/languages/archived.rb
+# for what's been retired (and why).
 
 # ────────────────────────────────────────────────────────────────────────
 echo
