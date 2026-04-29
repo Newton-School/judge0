@@ -179,6 +179,34 @@ STDIN_HDL='output-list a%B3.1.3 b%B3.1.3 sel%B3.1.3 out%B3.1.3;
 set a 1, set b 0, set sel 0, eval, output;
 set a 1, set b 0, set sel 1, eval, output;'
 
+# Jack: compiled to nand2tetris .vm, driven by a VM-emulator script in stdin.
+SRC_JACK='class Main {
+    function int addPair(int x, int y) {
+        var int a, b, result;
+        let a = x;
+        let b = y;
+        let result = a + b;
+        return result;
+    }
+}'
+
+STDIN_JACK='load Main.vm,
+
+set sp 256,
+set local 300,
+set argument 400,
+set this 3000,
+set that 4000,
+set argument[0] 11,
+set argument[1] 5,
+
+repeat 10 {
+vmstep;
+}
+
+output-list RAM[0]%D1.6.1 RAM[300]%D1.6.1;
+output;'
+
 # ────────────────────────────────────────────────────────────────────────
 # 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
 # dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
@@ -248,7 +276,9 @@ t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
 # truth-table to stdout. With a=1 b=0 sel=0 → out=1 (selecting a).
 t_stdin "HDL Nand2Tetris (3000)"  3000 "$SRC_HDL" "$STDIN_HDL" "|   1   |   0   |   0   |   1   |"
 
-skip "Jack (3002)"              "compiles to nand2tetris VM with screen output — not stdout-based"
+# Jack: source compiles to Main.vm, then a VM-emulator script in stdin
+# steps the function call and dumps RAM cells to stdout.
+t_stdin "Jack (3002)"           3002 "$SRC_JACK" "$STDIN_JACK" "|    401 |     11 |"
 
 # Archived languages are intentionally not tested here — the smoke test
 # verifies the *currently active* surface. See db/languages/archived.rb

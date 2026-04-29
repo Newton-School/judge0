@@ -290,12 +290,13 @@
           }
         },
         {
-          "name": "Jack (3002) — VM with screen output, not stdout",
+          "name": "Jack (3002)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"VM RAM dump\", () => pm.expect(pm.response.json().stdout).to.include(\"|    401 |     11 |\"));"]}}],
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3002,\n  \"source_code\": \"// Jack compiles to nand2tetris VM; output goes to a virtual screen, not stdout.\"\n}"}
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3002,\n  \"source_code\": \"class Main {\\n    function int addPair(int x, int y) {\\n        var int a, b, result;\\n        let a = x;\\n        let b = y;\\n        let result = a + b;\\n        return result;\\n    }\\n}\",\n  \"stdin\": \"load Main.vm,\\n\\nset sp 256,\\nset local 300,\\nset argument 400,\\nset this 3000,\\nset that 4000,\\nset argument[0] 11,\\nset argument[1] 5,\\n\\nrepeat 10 {\\nvmstep;\\n}\\n\\noutput-list RAM[0]%D1.6.1 RAM[300]%D1.6.1;\\noutput;\"\n}"}
           }
         }
       ]
