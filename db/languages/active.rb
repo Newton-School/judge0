@@ -68,13 +68,16 @@
     compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
     run_cmd: "./a.out"
   },
-  # C# moved from Mono to .NET 8 via dotnet-script (single-file scripting)
+  # C# moved from Mono to .NET 8 via dotnet-script (single-file scripting).
+  # DOTNET_ROOT must be exported because isolate strips most env vars and
+  # dotnet-script's launcher refuses to start ("You must install .NET")
+  # without it.
   {
     id: 51,
     name: "C# (.NET 8)",
     is_archived: false,
     source_file: "Main.cs",
-    run_cmd: "/usr/local/dotnet-tools/dotnet-script Main.cs"
+    run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-tools/dotnet-script Main.cs"
   },
   {
     id: 52,
@@ -153,13 +156,16 @@
     compile_cmd: "/usr/local/ghc-9.10.1/bin/ghc -dynamic %s main.hs",
     run_cmd: "./main"
   },
+  # JVM-based languages get -XX:ActiveProcessorCount=2 so the JVM sizes
+  # its GC / JIT / fork-join thread pools to the sandbox, not the host
+  # nproc — otherwise pthread_create EAGAIN inside the sandbox.
   {
     id: 62,
     name: "Java (OpenJDK 21)",
     is_archived: false,
     source_file: "Main.java",
     compile_cmd: "/usr/local/openjdk-21/bin/javac %s Main.java",
-    run_cmd: "/usr/local/openjdk-21/bin/java Main"
+    run_cmd: "/usr/local/openjdk-21/bin/java -XX:ActiveProcessorCount=2 Main"
   },
   {
     id: 64,
@@ -268,7 +274,7 @@
     is_archived: false,
     source_file: "Main.kt",
     compile_cmd: "/usr/local/kotlin-2.1.0/bin/kotlinc %s Main.kt",
-    run_cmd: "/usr/local/kotlin-2.1.0/bin/kotlin MainKt"
+    run_cmd: "JAVA_OPTS='-XX:ActiveProcessorCount=2' /usr/local/kotlin-2.1.0/bin/kotlin MainKt"
   },
   {
     id: 79,
@@ -291,7 +297,7 @@
     is_archived: false,
     source_file: "Main.scala",
     compile_cmd: "/usr/local/scala-3.6.2/bin/scalac %s Main.scala",
-    run_cmd: "/usr/local/scala-3.6.2/bin/scala Main"
+    run_cmd: "JAVA_OPTS='-XX:ActiveProcessorCount=2' /usr/local/scala-3.6.2/bin/scala Main"
   },
   {
     id: 82,
@@ -321,22 +327,22 @@
     name: "Clojure (1.12)",
     is_archived: false,
     source_file: "main.clj",
-    run_cmd: "/usr/local/bin/java -jar /usr/local/clojure-1.12.0.1495/clojure.jar main.clj"
+    run_cmd: "/usr/local/bin/java -XX:ActiveProcessorCount=2 -jar /usr/local/clojure-1.12.0.1495/clojure.jar main.clj"
   },
   {
     id: 87,
     name: "F# (.NET 8)",
     is_archived: false,
     source_file: "script.fsx",
-    run_cmd: "/usr/local/dotnet-sdk/dotnet fsi script.fsx"
+    run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-sdk/dotnet fsi script.fsx"
   },
   {
     id: 88,
     name: "Groovy (4.0.24)",
     is_archived: false,
     source_file: "script.groovy",
-    compile_cmd: "/usr/local/groovy-4.0.24/bin/groovyc %s script.groovy",
-    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/groovy-4.0.24/lib/*\" script"
+    compile_cmd: "JAVA_OPTS='-XX:ActiveProcessorCount=2' /usr/local/groovy-4.0.24/bin/groovyc %s script.groovy",
+    run_cmd: "/usr/local/bin/java -XX:ActiveProcessorCount=2 -cp \".:/usr/local/groovy-4.0.24/lib/*\" script"
   },
   {
     id: 89,
@@ -387,7 +393,7 @@
     name: "MIPS (Mars 4.5)",
     is_archived: false,
     source_file: "main.s",
-    run_cmd: "/usr/local/bin/java -Djava.util.logging.config.file=/usr/local/mars/logging.properties -jar /usr/local/mars/mars.jar nc main.s"
+    run_cmd: "/usr/local/bin/java -XX:ActiveProcessorCount=2 -Djava.util.logging.config.file=/usr/local/mars/logging.properties -jar /usr/local/mars/mars.jar nc main.s"
   },
   {
     id: 3002,

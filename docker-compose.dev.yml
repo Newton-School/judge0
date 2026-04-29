@@ -31,6 +31,10 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data/
     restart: always
+    # Local dev only: side services rarely use >100 MB; capping leaves
+    # the rest of the Docker Desktop allocation free for the judge0
+    # sandbox (which JVM/Erlang/etc. each pre-reserve >1 GiB on init).
+    mem_limit: 512m
 
   # Not actually currently used. Just for testing purposes in development.
   pgbouncer:
@@ -56,6 +60,7 @@ services:
     volumes:
       - redis-data:/data
     restart: always
+    mem_limit: 256m
 
   redis-sidecar:
     image: redis:6.2.6
@@ -63,6 +68,7 @@ services:
     volumes:
       - redis-data:/data-sidecar
     restart: always
+    mem_limit: 256m
 
   resque:
     image: ennexa/resque-web:latest

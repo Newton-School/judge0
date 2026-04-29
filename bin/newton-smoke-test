@@ -1,0 +1,327 @@
+#!/usr/bin/env bash
+#
+# Newton-owned end-to-end smoke test for the judge0 API.
+#
+# Submits a hello-world program for every active language id in
+# db/languages/active.rb to a running judge0 instance and verifies that:
+#   - the API accepts the submission
+#   - workers pick it up
+#   - the sandbox compiles + runs to "Accepted" status
+#   - stdout contains the expected marker
+#
+# Usage:
+#   ./bin/newton-smoke-test                  # against http://localhost:2358
+#   JUDGE0_URL=http://other:2358 ./bin/newton-smoke-test
+#
+# Prerequisites: jq, curl, a running judge0 stack with at least one Resque
+# worker draining the queue.
+#
+# Exits non-zero if any language fails. Intentionally tolerant of a few
+# languages that need bespoke source (HDL, Jack, Multi-file, Executable);
+# those are SKIPped with a reason.
+
+set -u
+
+URL="${JUDGE0_URL:-http://localhost:2358}"
+EXPECTED="Hello, Newton!"
+ARCH="$(uname -m)"
+
+PASS=0
+FAIL=0
+SKIP=0
+FAILED=()
+SKIPPED=()
+
+if ! command -v jq >/dev/null; then
+    echo "ERROR: jq is required (brew install jq / apt-get install jq)" >&2
+    exit 2
+fi
+
+echo "Submitting against ${URL} (arch=${ARCH})"
+echo
+
+# t <name> <language_id> <source_code>  [<expected_substring>]
+t() {
+    local name="$1" lid="$2" src="$3"
+    local expected="${4:-$EXPECTED}"
+    local payload resp status stdout err
+    payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" \
+        '{language_id:$lid, source_code:$sc}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    status="$(echo "$resp" | jq -r '.status.description // "?"')"
+    stdout="$(echo "$resp" | jq -r '.stdout // ""')"
+    if [[ "$status" == "Accepted" && "$stdout" == *"$expected"* ]]; then
+        printf "  \033[32mPASS\033[0m  %s\n" "$name"
+        PASS=$((PASS+1))
+    else
+        printf "  \033[31mFAIL\033[0m  %s  status=%s\n" "$name" "$status"
+        if [[ -n "$stdout" ]]; then
+            printf "        stdout: %s\n" "$(echo "$stdout" | head -1)"
+        fi
+        err="$(echo "$resp" | jq -r '.compile_output // .stderr // .message // empty' | head -3 | tr '\n' ' ')"
+        [[ -n "$err" ]] && printf "        err: %s\n" "$err"
+        FAIL=$((FAIL+1))
+        FAILED+=("$name (id $lid, $status)")
+    fi
+}
+
+skip() {
+    local name="$1" reason="$2"
+    printf "  \033[33mSKIP\033[0m  %s  (%s)\n" "$name" "$reason"
+    SKIP=$((SKIP+1))
+    SKIPPED+=("$name: $reason")
+}
+
+section() { printf "\n\033[1m== %s ==\033[0m\n" "$1"; }
+
+# ────────────────────────────────────────────────────────────────────────
+# Reusable source snippets
+# ────────────────────────────────────────────────────────────────────────
+SRC_PLAIN="$EXPECTED"
+
+SRC_BASH='echo "Hello, Newton!"'
+
+SRC_C='#include <stdio.h>
+int main(void) { printf("Hello, Newton!\n"); return 0; }'
+
+SRC_CPP='#include <iostream>
+int main() { std::cout << "Hello, Newton!" << std::endl; return 0; }'
+
+SRC_FORTRAN='program hello
+  print *, "Hello, Newton!"
+end program hello'
+
+SRC_OBJC='#include <stdio.h>
+int main(int argc, const char *argv[]) { printf("Hello, Newton!\n"); return 0; }'
+
+SRC_JAVA='public class Main {
+    public static void main(String[] a) {
+        System.out.println("Hello, Newton!");
+    }
+}'
+
+SRC_KOTLIN='fun main() { println("Hello, Newton!") }'
+
+SRC_SCALA='@main def hello() = println("Hello, Newton!")'
+
+SRC_GROOVY="println 'Hello, Newton!'"
+
+SRC_CLOJURE='(println "Hello, Newton!")'
+
+SRC_GO='package main
+import "fmt"
+func main() { fmt.Println("Hello, Newton!") }'
+
+SRC_RUST='fn main() { println!("Hello, Newton!"); }'
+
+SRC_SWIFT='print("Hello, Newton!")'
+
+SRC_HASKELL='main = putStrLn "Hello, Newton!"'
+
+SRC_OCAML='let () = print_endline "Hello, Newton!"'
+
+# Erlang escript needs an empty first line (active.rb's sed prepends one,
+# so we keep the source flush-left here).
+SRC_ERLANG='main(_) -> io:format("Hello, Newton!~n").'
+
+SRC_ELIXIR='IO.puts("Hello, Newton!")'
+
+SRC_R='cat("Hello, Newton!\n")'
+
+SRC_LUA='print("Hello, Newton!")'
+
+SRC_OCTAVE="disp('Hello, Newton!')"
+
+SRC_PASCAL=$(cat <<'PEOF'
+program hello;
+begin
+  writeln('Hello, Newton!');
+end.
+PEOF
+)
+
+SRC_PHP='<?php echo "Hello, Newton!\n";'
+
+SRC_PROLOG=$(cat <<'PEOF'
+:- initialization(main).
+main :- write('Hello, Newton!'), nl.
+PEOF
+)
+
+SRC_PYTHON='print("Hello, Newton!")'
+
+SRC_PYTHON_ML='import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+print("Hello, Newton!")'
+
+SRC_RUBY='puts "Hello, Newton!"'
+
+SRC_TS='console.log("Hello, Newton!");'
+
+SRC_PERL='print "Hello, Newton!\n";'
+
+SRC_CSHARP='System.Console.WriteLine("Hello, Newton!");'
+
+SRC_FSHARP='printfn "Hello, Newton!"'
+
+SRC_NODE='console.log("Hello, Newton!")'
+
+SRC_SBCL='(format t "Hello, Newton!~%")'
+
+SRC_D='import std.stdio;
+void main() { writeln("Hello, Newton!"); }'
+
+SRC_COBOL='       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Hello.
+       PROCEDURE DIVISION.
+           DISPLAY "Hello, Newton!".
+           STOP RUN.'
+
+SRC_SQL="SELECT 'Hello, Newton!';"
+
+SRC_FBC='print "Hello, Newton!"'
+
+# x86_64 Linux syscall hello world
+SRC_NASM='section .data
+    msg db "Hello, Newton!", 10
+    len equ $ - msg
+section .text
+global _start
+_start:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, msg
+    mov rdx, len
+    syscall
+    mov rax, 60
+    xor rdi, rdi
+    syscall'
+
+# MIPS hello world for MARS simulator (uses syscall convention)
+SRC_MIPS='        .data
+msg:    .asciiz "Hello, Newton!\n"
+        .text
+main:
+        li      $v0, 4
+        la      $a0, msg
+        syscall
+        li      $v0, 10
+        syscall'
+
+# ────────────────────────────────────────────────────────────────────────
+section "Trivial"
+# ────────────────────────────────────────────────────────────────────────
+t "Plain Text (43)"             43   "$SRC_PLAIN"
+skip "Executable (44)"          "needs precompiled a.out via additional_files"
+
+# ────────────────────────────────────────────────────────────────────────
+section "Shell / scripting"
+# ────────────────────────────────────────────────────────────────────────
+t "Bash 5.2.37 (46)"            46   "$SRC_BASH"
+t "Lua 5.4.7 (64)"              64   "$SRC_LUA"
+t "Perl 5.36 (85)"              85   "$SRC_PERL"
+t "PHP 8.4.1 (68)"              68   "$SRC_PHP"
+t "Python 3.13.1 (71)"          71   "$SRC_PYTHON"
+t "Python 3.12.7 ML (2000)"     2000 "$SRC_PYTHON_ML"
+t "Ruby 3.3.6 (72)"             72   "$SRC_RUBY"
+t "Node.js 22.11.0 (1999)"      1999 "$SRC_NODE"
+t "TypeScript 5.7.2 (74)"       74   "$SRC_TS"
+t "R 4.5.2 (80)"                80   "$SRC_R"
+
+# ────────────────────────────────────────────────────────────────────────
+section "C / C++ / Fortran / Obj-C"
+# ────────────────────────────────────────────────────────────────────────
+t "C GCC 7.4 → 9.5 (48)"        48   "$SRC_C"
+t "C GCC 8.3 → 9.5 (49)"        49   "$SRC_C"
+t "C GCC 9.5 (50)"              50   "$SRC_C"
+t "C GCC 14.2 (1001)"           1001 "$SRC_C"
+t "C Clang 19 (75)"             75   "$SRC_C"
+t "C++ GCC 7.4 → 9.5 (52)"      52   "$SRC_CPP"
+t "C++ GCC 8.3 → 9.5 (53)"      53   "$SRC_CPP"
+t "C++ GCC 9.5 (54)"            54   "$SRC_CPP"
+t "C++ GCC 14.2 (1002)"         1002 "$SRC_CPP"
+t "C++ Clang 19 (76)"           76   "$SRC_CPP"
+t "Fortran gfortran 14 (59)"    59   "$SRC_FORTRAN"
+t "Objective-C Clang 19 (79)"   79   "$SRC_OBJC"
+
+# ────────────────────────────────────────────────────────────────────────
+section "JVM"
+# ────────────────────────────────────────────────────────────────────────
+t "Java OpenJDK 21 (62)"        62   "$SRC_JAVA"
+t "Kotlin 2.1.0 (78)"           78   "$SRC_KOTLIN"
+t "Scala 3.6.2 (81)"            81   "$SRC_SCALA"
+t "Groovy 4.0.24 (88)"          88   "$SRC_GROOVY"
+t "Clojure 1.12 (86)"           86   "$SRC_CLOJURE"
+
+# ────────────────────────────────────────────────────────────────────────
+section ".NET"
+# ────────────────────────────────────────────────────────────────────────
+t "C# .NET 8 (51)"              51   "$SRC_CSHARP"
+t "F# .NET 8 (87)"              87   "$SRC_FSHARP"
+
+# ────────────────────────────────────────────────────────────────────────
+section "Compiled (other)"
+# ────────────────────────────────────────────────────────────────────────
+t "Go 1.23.4 (60)"              60   "$SRC_GO"
+t "Rust 1.83.0 (73)"            73   "$SRC_RUST"
+t "Swift 6.0.3 (83)"            83   "$SRC_SWIFT"
+t "Haskell GHC 9.10.1 (61)"     61   "$SRC_HASKELL"
+t "OCaml 5.2.0 (65)"            65   "$SRC_OCAML"
+t "Erlang OTP 27 (58)"          58   "$SRC_ERLANG"
+t "Elixir 1.17.3 (57)"          57   "$SRC_ELIXIR"
+t "Octave 8.4.0 (66)"           66   "$SRC_OCTAVE"
+t "Pascal FPC 3.2.2 (67)"       67   "$SRC_PASCAL"
+t "GNU Prolog 1.5.0 (69)"       69   "$SRC_PROLOG"
+t "SBCL 2.4.10 (55)"            55   "$SRC_SBCL"
+t "D DMD 2.110.0 (56)"          56   "$SRC_D"
+t "GnuCOBOL 3.2 (77)"           77   "$SRC_COBOL"
+
+# ────────────────────────────────────────────────────────────────────────
+section "SQL"
+# ────────────────────────────────────────────────────────────────────────
+t "SQLite 3.47.0 (82)"          82   "$SRC_SQL"
+
+# ────────────────────────────────────────────────────────────────────────
+section "Architecture-specific"
+# ────────────────────────────────────────────────────────────────────────
+case "$ARCH" in
+    x86_64|amd64)
+        t "NASM 2.16.03 (45)"   45   "$SRC_NASM"
+        t "FreeBASIC 1.10.1 (47)" 47 "$SRC_FBC"
+        ;;
+    aarch64|arm64)
+        skip "NASM (45)"        "amd64-only at runtime"
+        skip "FreeBASIC (47)"   "amd64-only upstream binary"
+        ;;
+    *)
+        skip "NASM (45)"        "untested arch=$ARCH"
+        skip "FreeBASIC (47)"   "untested arch=$ARCH"
+        ;;
+esac
+
+# ────────────────────────────────────────────────────────────────────────
+section "Newton extras"
+# ────────────────────────────────────────────────────────────────────────
+t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
+skip "HDL Nand2Tetris (3000)"   "needs valid .hdl chip definition; not a hello-world language"
+skip "Jack (3002)"              "needs Jack class+main; not a hello-world language"
+
+skip "Multi-file program (89)"  "needs additional_files tar"
+
+# ────────────────────────────────────────────────────────────────────────
+echo
+printf "\033[1mSummary:\033[0m  \033[32m%d passed\033[0m, \033[31m%d failed\033[0m, \033[33m%d skipped\033[0m\n" \
+    "$PASS" "$FAIL" "$SKIP"
+if (( FAIL > 0 )); then
+    echo
+    printf "\033[1mFailures:\033[0m\n"
+    for f in "${FAILED[@]}"; do printf "  - %s\n" "$f"; done
+fi
+if (( SKIP > 0 )); then
+    echo
+    printf "\033[1mSkipped:\033[0m\n"
+    for s in "${SKIPPED[@]}"; do printf "  - %s\n" "$s"; done
+fi
+
+(( FAIL == 0 ))
