@@ -69,15 +69,19 @@
     run_cmd: "./a.out"
   },
   # C# moved from Mono to .NET 8 via dotnet-script (single-file scripting).
-  # DOTNET_ROOT must be exported because isolate strips most env vars and
-  # dotnet-script's launcher refuses to start ("You must install .NET")
-  # without it.
+  # NUGET_FALLBACK_PACKAGES points at the pre-warmed read-only cache baked
+  # into the image at /usr/local/share/dotnet-script-cache (NewtonDockerfile
+  # pre-warms during build) so dotnet build resolves NuGet refs from there
+  # without re-downloading. NUGET_PACKAGES (the writable location) defaults
+  # to /tmp/.nuget/packages via HOME=/tmp set by isolate. Without this
+  # the first run materialises ~200 MB of NuGet refs into /tmp and blows
+  # RLIMIT_FSIZE (signal 25, SIGXFSZ).
   {
     id: 51,
     name: "C# (.NET 8)",
     is_archived: false,
     source_file: "Main.cs",
-    run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-tools/dotnet-script Main.cs"
+    run_cmd: "NUGET_FALLBACK_PACKAGES=/usr/local/share/dotnet-script-cache/.nuget/packages DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-tools/dotnet-script Main.cs"
   },
   {
     id: 52,
@@ -345,7 +349,7 @@
     name: "F# (.NET 8)",
     is_archived: false,
     source_file: "script.fsx",
-    run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-sdk/dotnet fsi script.fsx"
+    run_cmd: "NUGET_FALLBACK_PACKAGES=/usr/local/share/dotnet-script-cache/.nuget/packages DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-sdk/dotnet fsi script.fsx"
   },
   {
     id: 88,

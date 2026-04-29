@@ -85,6 +85,20 @@ EXPOSE $VIRTUAL_PORT
 # C# language id 51 runs single-file scripts via dotnet-script.
 RUN dotnet tool install --tool-path /usr/local/dotnet-tools dotnet-script
 
+# Pre-warm dotnet-script's NuGet + script cache during image build, so a
+# sandboxed first run doesn't have to materialise ~200 MB of NuGet refs
+# at submission time (which exceeds RLIMIT_FSIZE / takes long enough to
+# blow CPU_TIME_LIMIT). The cache lands at /usr/local/share/dotnet-script-cache; the
+# active.rb run_cmd points NUGET_PACKAGES + HOME at it for read access.
+RUN set -eux; \
+    mkdir -p /usr/local/share/dotnet-script-cache; \
+    cd /tmp && echo 'System.Console.WriteLine("warm");' > warm.cs; \
+    HOME=/usr/local/share/dotnet-script-cache \
+    DOTNET_ROOT=/usr/local/dotnet-sdk \
+    /usr/local/dotnet-tools/dotnet-script /tmp/warm.cs >/dev/null; \
+    rm -f /tmp/warm.cs; \
+    chmod -R a+rX /usr/local/share/dotnet-script-cache
+
 # Normalise architecture-divergent install paths so db/languages/active.rb
 # can use a single canonical path on both arm64 (dev) and amd64 (prod).
 # On arm64 some languages fall back to apt versions in the compilers image.
