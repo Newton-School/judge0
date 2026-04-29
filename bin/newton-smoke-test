@@ -36,6 +36,14 @@ if ! command -v jq >/dev/null; then
     echo "ERROR: jq is required (brew install jq / apt-get install jq)" >&2
     exit 2
 fi
+if ! command -v base64 >/dev/null; then
+    echo "ERROR: base64 is required" >&2
+    exit 2
+fi
+if ! command -v python3 >/dev/null; then
+    echo "ERROR: python3 is required (used to build the multi-file zip)" >&2
+    exit 2
+fi
 
 echo "Submitting against ${URL} (arch=${ARCH})"
 echo
@@ -49,6 +57,49 @@ t() {
         '{language_id:$lid, source_code:$sc}')"
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
         -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+# t_b64 <name> <language_id> <source_code_base64> [<expected_substring>]
+# Submits source_code as base64 (binary or otherwise non-UTF-8 payloads).
+t_b64() {
+    local name="$1" lid="$2" b64="$3"
+    local expected="${4:-$EXPECTED}"
+    local payload resp
+    payload="$(jq -nc --arg sc "$b64" --argjson lid "$lid" \
+        '{language_id:$lid, source_code:$sc}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&base64_encoded=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    # base64_encoded=true returns stdout as base64 too — decode for comparison
+    local stdout_b64 stdout
+    stdout_b64="$(echo "$resp" | jq -r '.stdout // ""')"
+    stdout="$(echo "$stdout_b64" | base64 --decode 2>/dev/null || echo "")"
+    resp="$(echo "$resp" | jq --arg s "$stdout" '.stdout = $s')"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+# t_proj <name> <language_id> <files_base64_zip> [<expected_substring>]
+# Submits a Multi-file project: source_code is empty, additional_files
+# is a base64 zip with a `run` (and optional `compile`) script plus
+# whatever sources the project needs.
+t_proj() {
+    local name="$1" lid="$2" zip_b64="$3"
+    local expected="${4:-$EXPECTED}"
+    local payload resp
+    payload="$(jq -nc --arg af "$zip_b64" --argjson lid "$lid" \
+        '{language_id:$lid, additional_files:$af}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&base64_encoded=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    local stdout_b64 stdout
+    stdout_b64="$(echo "$resp" | jq -r '.stdout // ""')"
+    stdout="$(echo "$stdout_b64" | base64 --decode 2>/dev/null || echo "")"
+    resp="$(echo "$resp" | jq --arg s "$stdout" '.stdout = $s')"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+_check_resp() {
+    local name="$1" lid="$2" expected="$3" resp="$4"
+    local status stdout err
     status="$(echo "$resp" | jq -r '.status.description // "?"')"
     stdout="$(echo "$resp" | jq -r '.stdout // ""')"
     if [[ "$status" == "Accepted" && "$stdout" == *"$expected"* ]]; then
@@ -213,7 +264,12 @@ main:
 section "Trivial"
 # ────────────────────────────────────────────────────────────────────────
 t "Plain Text (43)"             43   "$SRC_PLAIN"
-skip "Executable (44)"          "needs precompiled a.out via additional_files"
+
+# Executable (44): the `chmod +x a.out && ./a.out` run_cmd lets the kernel
+# pick the interpreter from the shebang, so a shell script works without
+# needing an arch-specific compiled binary.
+SRC_EXEC=$'#!/bin/sh\necho "Hello, Newton!"\n'
+t_b64 "Executable shebang (44)"  44   "$(printf '%s' "$SRC_EXEC" | base64 | tr -d '\n')"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Shell / scripting"
@@ -304,10 +360,20 @@ esac
 section "Newton extras"
 # ────────────────────────────────────────────────────────────────────────
 t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
-skip "HDL Nand2Tetris (3000)"   "needs valid .hdl chip definition; not a hello-world language"
-skip "Jack (3002)"              "needs Jack class+main; not a hello-world language"
+skip "HDL Nand2Tetris (3000)"   "nand2tetris CLI is a simulator/REPL — needs stdin or a .tst test file, not stdout-based"
+skip "Jack (3002)"              "compiles to nand2tetris VM with screen output — not stdout-based"
 
-skip "Multi-file program (89)"  "needs additional_files tar"
+# Multi-file (89): build a zip containing a `run` script. The is_project
+# code path in IsolateJob skips the standard `source_code` write and
+# instead unzips additional_files inside the box, then runs `bash run`.
+PROJ_ZIP_B64="$(python3 -c '
+import zipfile, io, base64
+buf = io.BytesIO()
+with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    zf.writestr("run", "#!/bin/sh\necho \"Hello, Newton!\"\n")
+print(base64.b64encode(buf.getvalue()).decode())
+')"
+t_proj "Multi-file program (89)" 89 "$PROJ_ZIP_B64"
 
 # ────────────────────────────────────────────────────────────────────────
 echo
