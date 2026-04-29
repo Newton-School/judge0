@@ -52,6 +52,19 @@ t() {
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
+# t_stdin <name> <language_id> <source_code> <stdin> <expected_substring>
+# Same as t() but also sends a stdin payload — used by HDL where the test
+# script lives in stdin and the chip definition lives in source_code.
+t_stdin() {
+    local name="$1" lid="$2" src="$3" stdin="$4" expected="$5"
+    local payload resp
+    payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
+        '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
 _check_resp() {
     local name="$1" lid="$2" expected="$3" resp="$4"
     local status stdout err
@@ -149,6 +162,23 @@ main:
         li      $v0, 10
         syscall'
 
+# HDL: a 2-input Mux chip (idempotent, easy to verify against truth table).
+# stdin carries the .tst script that drives the simulator.
+SRC_HDL='CHIP Mux {
+    IN a, b, sel;
+    OUT out;
+
+    PARTS:
+    Not(in=sel, out=notSel);
+    And(a=a, b=notSel, out=abnot);
+    And(a=b, b=sel, out=ab);
+    Or(a=abnot, b=ab, out=out);
+}'
+
+STDIN_HDL='output-list a%B3.1.3 b%B3.1.3 sel%B3.1.3 out%B3.1.3;
+set a 1, set b 0, set sel 0, eval, output;
+set a 1, set b 0, set sel 1, eval, output;'
+
 # ────────────────────────────────────────────────────────────────────────
 # 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
 # dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
@@ -213,7 +243,11 @@ esac
 section "Newton extras"
 # ────────────────────────────────────────────────────────────────────────
 t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
-skip "HDL Nand2Tetris (3000)"   "nand2tetris CLI is a simulator/REPL — needs stdin or a .tst test file, not stdout-based"
+
+# HDL drives the chip via a .tst-style script in stdin and prints a
+# truth-table to stdout. With a=1 b=0 sel=0 → out=1 (selecting a).
+t_stdin "HDL Nand2Tetris (3000)"  3000 "$SRC_HDL" "$STDIN_HDL" "|   1   |   0   |   0   |   1   |"
+
 skip "Jack (3002)"              "compiles to nand2tetris VM with screen output — not stdout-based"
 
 # Archived languages are intentionally not tested here — the smoke test
