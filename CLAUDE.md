@@ -80,16 +80,14 @@ language ids exist and what they invoke. Editing it requires a
   ```
   And `-fallow-argument-mismatch` for Fortran (gfortran 10+ broke
   argument-mismatch tolerance).
-- **JVM-based languages** (Java, Kotlin, Scala, Clojure, Groovy, MARS)
-  pass `-XX:ActiveProcessorCount=2` (or set `JAVA_OPTS` for launcher
-  scripts). Without this the JVM sees host nproc and spawns threadpools
-  that hit `RLIMIT_NPROC` inside the sandbox → `pthread_create EAGAIN`.
-- **C# / F# (.NET 8)** export `DOTNET_ROOT=/usr/local/dotnet-sdk` inline.
-  isolate strips most env vars; without `DOTNET_ROOT`, dotnet-script's
-  launcher errors with "You must install .NET".
-- **GCC ids 48/49/50, 52/53/54** all alias to `/usr/local/gcc-9.5.0/...`
-  (the legacy compiler in the image). New submissions should use
-  **id 1001 (C / GCC 14.2.0)** or **id 1002 (C++ / GCC 14.2.0)**.
+- **JVM-based languages** (Java, MARS) pass `-XX:ActiveProcessorCount=2`
+  (or set `JAVA_OPTS` for launcher scripts). Without this the JVM sees
+  host nproc and spawns threadpools that hit `RLIMIT_NPROC` inside the
+  sandbox → `pthread_create EAGAIN`.
+- **GCC id 50 (C) / 54 (C++)** alias to `/usr/local/gcc-9.5.0/...` —
+  the legacy compiler kept alongside GCC 14 for back-compat with old
+  student code. New submissions should use **id 1001 (C / GCC 14.2.0)**
+  or **id 1002 (C++ / GCC 14.2.0)**.
 
 ## Build commands
 
@@ -153,12 +151,12 @@ in `judge0.conf` explain each. Summary:
 |---|---|---|---|
 | `ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT` | false | **true** | so isolate runs without `--cg` (no systemd cgroup delegation needed) |
 | `ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT` | false | **true** | same |
-| `MEMORY_LIMIT` | 128 MB | **4 GiB** | JVM/Erlang/SBCL/numpy each pre-reserve >1 GiB |
-| `MAX_MEMORY_LIMIT` | 512 MB | **8 GiB** | per-submission memory_limit cap |
-| `MAX_PROCESSES_AND_OR_THREADS` | 60 | **512** | JVM/numpy thread pools |
-| `MAX_MAX_PROCESSES_AND_OR_THREADS` | 120 | **1024** | compile-time max |
-| `MAX_FILE_SIZE` | 1 MB | **256 MB** | dotnet-script materialises ~150 MB NuGet refs; Go binaries can be > 64 MB |
-| `MAX_MAX_FILE_SIZE` | 4 MB | **1 GiB** | per-submission max |
+| `MEMORY_LIMIT` | 128 MB | **8 GiB** | JVM 21 + Node 22 + numpy each pre-reserve >1 GiB |
+| `MAX_MEMORY_LIMIT` | 512 MB | **16 GiB** | per-submission memory_limit cap |
+| `MAX_PROCESSES_AND_OR_THREADS` | 60 | **2048** | JVM/Node thread pools |
+| `MAX_MAX_PROCESSES_AND_OR_THREADS` | 120 | **4096** | compile-time max |
+| `MAX_FILE_SIZE` | 1 MB | **1 GiB** | Go 1.23 binaries + Java class+jar bundles can exceed 1 MB |
+| `MAX_MAX_FILE_SIZE` | 4 MB | **2 GiB** | per-submission max |
 
 ## Common pitfalls (encountered while building 0.26 + Phase 2 — don't repeat)
 
@@ -168,10 +166,9 @@ in `judge0.conf` explain each. Summary:
    tuning, not compose env.
 2. **isolate `--cg` mode requires `/run/isolate/cgroup`** which only exists
    if `isolate-cg-keeper` (a systemd service) is running. In a non-systemd
-   container that fails with "Cannot open /run/isolate/cgroup". Workaround:
-   per-process rlimits via the `ENABLE_PER_PROCESS_*` flags (see above).
-   Production with proper systemd setup can flip both to false to use
-   cgroup-mode enforcement.
+   container that fails with "Cannot open /run/isolate/cgroup". We rely on
+   per-process rlimits via `ENABLE_PER_PROCESS_*=true` (see above) so this
+   doesn't bite us.
 3. **isolate command in `app/jobs/isolate_job.rb` doesn't expose `-O`
    (open files).** R and Go submissions hit RLIMIT_NOFILE. Adding it
    would mean editing IsolateJob and adding a `MAX_OPEN_FILES` knob to
