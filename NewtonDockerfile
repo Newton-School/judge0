@@ -1,4 +1,4 @@
-FROM newtonschool/judge0-newton-compiler:0.26 AS production
+FROM newtonschool/judge0-newton-compiler:0.27 AS production
 
 
 ENV JUDGE0_HOMEPAGE "https://judge0-public.newtonschool.co/"
@@ -37,7 +37,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 # Step 2: OpenSSL 1.1.1w
-# Compiler image 0.26 ships only Ruby 3.3.6 (for student-facing Ruby
+# Compiler image 0.27 ships only Ruby 3.3.6 (for student-facing Ruby
 # submissions, language id 72). The Rails app stays on Rails 5 + Ruby 2.7
 # in this PR; a Rails major-version upgrade is out of scope here. Bookworm
 # ships OpenSSL 3 only, but Ruby 2.7's bundled openssl extension does not

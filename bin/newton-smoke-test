@@ -261,23 +261,16 @@ main:
         syscall'
 
 # ────────────────────────────────────────────────────────────────────────
-section "Trivial"
+# 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
+# dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
+# section below documents what's gone; submitting any of those returns a
+# 422 "language is archived" from the API.
 # ────────────────────────────────────────────────────────────────────────
-t "Plain Text (43)"             43   "$SRC_PLAIN"
-
-# Executable (44): the `chmod +x a.out && ./a.out` run_cmd lets the kernel
-# pick the interpreter from the shebang, so a shell script works without
-# needing an arch-specific compiled binary.
-SRC_EXEC=$'#!/bin/sh\necho "Hello, Newton!"\n'
-t_b64 "Executable shebang (44)"  44   "$(printf '%s' "$SRC_EXEC" | base64 | tr -d '\n')"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Shell / scripting"
 # ────────────────────────────────────────────────────────────────────────
 t "Bash 5.2.37 (46)"            46   "$SRC_BASH"
-t "Lua 5.4.7 (64)"              64   "$SRC_LUA"
-t "Perl 5.36 (85)"              85   "$SRC_PERL"
-t "PHP 8.4.1 (68)"              68   "$SRC_PHP"
 t "Python 3.13.1 (71)"          71   "$SRC_PYTHON"
 t "Python 3.12.7 ML (2000)"     2000 "$SRC_PYTHON_ML"
 t "Ruby 3.3.6 (72)"             72   "$SRC_RUBY"
@@ -286,52 +279,23 @@ t "TypeScript 5.7.2 (74)"       74   "$SRC_TS"
 t "R 4.5.2 (80)"                80   "$SRC_R"
 
 # ────────────────────────────────────────────────────────────────────────
-section "C / C++ / Fortran / Obj-C"
+section "C / C++"
 # ────────────────────────────────────────────────────────────────────────
-skip "C GCC 7.4 (48)"           "archived in 0.57: was an alias to GCC 9.5; use id 50 or 1001"
-skip "C GCC 8.3 (49)"           "archived in 0.57: was an alias to GCC 9.5; use id 50 or 1001"
 t "C GCC 9.5 (50)"              50   "$SRC_C"
 t "C GCC 14.2 (1001)"           1001 "$SRC_C"
-t "C Clang 19 (75)"             75   "$SRC_C"
-skip "C++ GCC 7.4 (52)"         "archived in 0.57: was an alias to GCC 9.5; use id 54 or 1002"
-skip "C++ GCC 8.3 (53)"         "archived in 0.57: was an alias to GCC 9.5; use id 54 or 1002"
 t "C++ GCC 9.5 (54)"            54   "$SRC_CPP"
 t "C++ GCC 14.2 (1002)"         1002 "$SRC_CPP"
-t "C++ Clang 19 (76)"           76   "$SRC_CPP"
-t "Fortran gfortran 14 (59)"    59   "$SRC_FORTRAN"
-t "Objective-C Clang 19 (79)"   79   "$SRC_OBJC"
 
 # ────────────────────────────────────────────────────────────────────────
 section "JVM"
 # ────────────────────────────────────────────────────────────────────────
 t "Java OpenJDK 21 (62)"        62   "$SRC_JAVA"
-t "Kotlin 2.1.0 (78)"           78   "$SRC_KOTLIN"
-t "Scala 3.6.2 (81)"            81   "$SRC_SCALA"
-t "Groovy 4.0.24 (88)"          88   "$SRC_GROOVY"
-t "Clojure 1.12 (86)"           86   "$SRC_CLOJURE"
 
 # ────────────────────────────────────────────────────────────────────────
-section ".NET"
-# ────────────────────────────────────────────────────────────────────────
-skip "C# .NET 8 (51)"           "archived in 0.33: needs isolate cgroup-mode (.NET CoreCLR incompatible with rlimit-mode -m / -f)"
-skip "F# .NET 8 (87)"           "archived in 0.33: needs isolate cgroup-mode (.NET CoreCLR incompatible with rlimit-mode -m / -f)"
-
-# ────────────────────────────────────────────────────────────────────────
-section "Compiled (other)"
+section "Compiled"
 # ────────────────────────────────────────────────────────────────────────
 t "Go 1.23.4 (60)"              60   "$SRC_GO"
 t "Rust 1.83.0 (73)"            73   "$SRC_RUST"
-t "Swift 6.0.3 (83)"            83   "$SRC_SWIFT"
-t "Haskell GHC 9.10.1 (61)"     61   "$SRC_HASKELL"
-t "OCaml 5.2.0 (65)"            65   "$SRC_OCAML"
-t "Erlang OTP 27 (58)"          58   "$SRC_ERLANG"
-t "Elixir 1.17.3 (57)"          57   "$SRC_ELIXIR"
-t "Octave 8.4.0 (66)"           66   "$SRC_OCTAVE"
-t "Pascal FPC 3.2.2 (67)"       67   "$SRC_PASCAL"
-t "GNU Prolog 1.5.0 (69)"       69   "$SRC_PROLOG"
-t "SBCL 2.4.10 (55)"            55   "$SRC_SBCL"
-t "D DMD 2.110.0 (56)"          56   "$SRC_D"
-t "GnuCOBOL 3.2 (77)"           77   "$SRC_COBOL"
 
 # ────────────────────────────────────────────────────────────────────────
 section "SQL"
@@ -363,17 +327,44 @@ t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
 skip "HDL Nand2Tetris (3000)"   "nand2tetris CLI is a simulator/REPL — needs stdin or a .tst test file, not stdout-based"
 skip "Jack (3002)"              "compiles to nand2tetris VM with screen output — not stdout-based"
 
-# Multi-file (89): build a zip containing a `run` script. The is_project
-# code path in IsolateJob skips the standard `source_code` write and
-# instead unzips additional_files inside the box, then runs `bash run`.
-PROJ_ZIP_B64="$(python3 -c '
-import zipfile, io, base64
-buf = io.BytesIO()
-with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-    zf.writestr("run", "#!/bin/sh\necho \"Hello, Newton!\"\n")
-print(base64.b64encode(buf.getvalue()).decode())
-')"
-t_proj "Multi-file program (89)" 89 "$PROJ_ZIP_B64"
+# ────────────────────────────────────────────────────────────────────────
+section "Archived (toolchains removed in 0.27)"
+# ────────────────────────────────────────────────────────────────────────
+ARCHIVED_REASON_GCC="archived in 0.57: was an alias to GCC 9.5; use id 50/54 or 1001/1002"
+ARCHIVED_REASON_DOTNET="archived in 0.33: needs isolate cgroup-mode (.NET CoreCLR incompatible with rlimit-mode -m / -f)"
+ARCHIVED_REASON_LOW_USAGE="archived in 0.59 (low prod usage): toolchain removed from compilers:0.27"
+
+skip "Plain Text (43)"          "$ARCHIVED_REASON_LOW_USAGE"
+skip "Executable (44)"          "$ARCHIVED_REASON_LOW_USAGE"
+skip "C GCC 7.4 (48)"           "$ARCHIVED_REASON_GCC"
+skip "C GCC 8.3 (49)"           "$ARCHIVED_REASON_GCC"
+skip "C# .NET 8 (51)"           "$ARCHIVED_REASON_DOTNET"
+skip "C++ GCC 7.4 (52)"         "$ARCHIVED_REASON_GCC"
+skip "C++ GCC 8.3 (53)"         "$ARCHIVED_REASON_GCC"
+skip "SBCL 2.4.10 (55)"         "$ARCHIVED_REASON_LOW_USAGE"
+skip "D DMD 2.110.0 (56)"       "$ARCHIVED_REASON_LOW_USAGE"
+skip "Elixir 1.17.3 (57)"       "$ARCHIVED_REASON_LOW_USAGE"
+skip "Erlang OTP 27 (58)"       "$ARCHIVED_REASON_LOW_USAGE"
+skip "Fortran gfortran 14 (59)" "$ARCHIVED_REASON_LOW_USAGE"
+skip "Haskell GHC 9.10.1 (61)"  "$ARCHIVED_REASON_LOW_USAGE"
+skip "Lua 5.4.7 (64)"           "$ARCHIVED_REASON_LOW_USAGE"
+skip "OCaml 5.2.0 (65)"         "$ARCHIVED_REASON_LOW_USAGE"
+skip "Octave 8.4.0 (66)"        "$ARCHIVED_REASON_LOW_USAGE"
+skip "Pascal FPC 3.2.2 (67)"    "$ARCHIVED_REASON_LOW_USAGE"
+skip "PHP 8.4.1 (68)"           "$ARCHIVED_REASON_LOW_USAGE"
+skip "GNU Prolog 1.5.0 (69)"    "$ARCHIVED_REASON_LOW_USAGE"
+skip "C Clang 19 (75)"          "$ARCHIVED_REASON_LOW_USAGE"
+skip "C++ Clang 19 (76)"        "$ARCHIVED_REASON_LOW_USAGE"
+skip "GnuCOBOL 3.2 (77)"        "$ARCHIVED_REASON_LOW_USAGE"
+skip "Kotlin 2.1.0 (78)"        "$ARCHIVED_REASON_LOW_USAGE"
+skip "Objective-C Clang 19 (79)" "$ARCHIVED_REASON_LOW_USAGE"
+skip "Scala 3.6.2 (81)"         "$ARCHIVED_REASON_LOW_USAGE"
+skip "Swift 6.0.3 (83)"         "$ARCHIVED_REASON_LOW_USAGE"
+skip "Perl 5.36 (85)"           "$ARCHIVED_REASON_LOW_USAGE"
+skip "Clojure 1.12 (86)"        "$ARCHIVED_REASON_LOW_USAGE"
+skip "F# .NET 8 (87)"           "$ARCHIVED_REASON_DOTNET"
+skip "Groovy 4.0.24 (88)"       "$ARCHIVED_REASON_LOW_USAGE"
+skip "Multi-file program (89)"  "$ARCHIVED_REASON_LOW_USAGE"
 
 # ────────────────────────────────────────────────────────────────────────
 echo

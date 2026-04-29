@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.26` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.27` | what we layer on |
 | Sandbox | `isolate` v2.0 (cgroup v2 capable, currently rlimit mode) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -96,11 +96,11 @@ language ids exist and what they invoke. Editing it requires a
 ```bash
 # arm64 (Mac dev)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.58 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.59 --load .
 
 # amd64 (EC2 / prod)
 docker buildx build --platform linux/amd64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.58 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.59 --load .
 ```
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
@@ -114,7 +114,7 @@ images are old and may not start on current Docker Desktop, so:
 ```bash
 # Build the app image first (once, then re-run only when Gemfile/Dockerfile changes)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.58 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.59 --load .
 
 # Bring up only the essentials (skip nginx + resque-web + pgbouncer)
 docker compose -f docker-compose.dev.yml up -d judge0 db redis redis-sidecar
@@ -200,7 +200,8 @@ in `judge0.conf` explain each. Summary:
 
 - Docker Hub: `newtonschool/newton-judge0`
 - Pre-modernisation staging tag: `0.53` (compiler base 0.25)
-- Phase-2 modernisation tag: `0.58` (compiler base 0.26)
+- Phase-2 modernisation tag: `0.58` (compiler base 0.26) — superseded
+- Phase-3 trim tag: `0.59` (compiler base 0.27, 25 low-usage langs archived) — current
 - Production currently runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
   unrelated to Docker Hub tags. Modernisation will roll prod after staging soak.
 
