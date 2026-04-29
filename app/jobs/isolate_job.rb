@@ -168,7 +168,7 @@ class IsolateJob < ApplicationJob
     -f #{Config::MAX_MAX_FILE_SIZE} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
-    -E JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=1 \
+    -E JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
     -d /etc:noexec \
     --run \
@@ -241,7 +241,7 @@ class IsolateJob < ApplicationJob
     -f #{submission.max_file_size} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
-    -E JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=1 \
+    -E JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
     -d /etc:noexec \
     --run \
