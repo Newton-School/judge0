@@ -347,5 +347,30 @@
     source_file: "Main.vb",
     compile_cmd: "/usr/bin/vbnc %s Main.vb",
     run_cmd: "/usr/bin/mono Main.exe"
+  },
+  # Archived in 0.26 (Phase 2): .NET 8 CoreCLR is fundamentally incompatible
+  # with isolate's rlimit-mode sandboxing. The runtime mmaps multi-GB of
+  # virtual address on init and aborts on any non-zero RLIMIT_FSIZE. Both
+  # are inherent to the isolate -m / -f flags. The fix is moving isolate
+  # to cgroup-mode (--cg / --cg-mem), which uses cgroup memory.max (counts
+  # RSS only, not virtual reservations) and ignores RLIMIT_FSIZE — but
+  # that needs the layered cgroup setup that's still WIP. Once the
+  # cgroup-mode docker-entrypoint.sh lands, restore these to active.rb.
+  # The pre-warmed dotnet-script NuGet cache at /usr/local/share/dotnet-
+  # script-cache and NUGET_FALLBACK_PACKAGES env var are already in place
+  # for that revival.
+  {
+    id: 51,
+    name: "C# (.NET 8)",
+    is_archived: true,
+    source_file: "Main.cs",
+    run_cmd: "NUGET_FALLBACK_PACKAGES=/usr/local/share/dotnet-script-cache/.nuget/packages DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-tools/dotnet-script Main.cs"
+  },
+  {
+    id: 87,
+    name: "F# (.NET 8)",
+    is_archived: true,
+    source_file: "script.fsx",
+    run_cmd: "NUGET_FALLBACK_PACKAGES=/usr/local/share/dotnet-script-cache/.nuget/packages DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-sdk/dotnet fsi script.fsx"
   }
 ]

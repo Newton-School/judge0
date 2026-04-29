@@ -313,8 +313,8 @@ t "Clojure 1.12 (86)"           86   "$SRC_CLOJURE"
 # ────────────────────────────────────────────────────────────────────────
 section ".NET"
 # ────────────────────────────────────────────────────────────────────────
-t "C# .NET 8 (51)"              51   "$SRC_CSHARP"
-t "F# .NET 8 (87)"              87   "$SRC_FSHARP"
+skip "C# .NET 8 (51)"           "archived in 0.33: needs isolate cgroup-mode (.NET CoreCLR incompatible with rlimit-mode -m / -f)"
+skip "F# .NET 8 (87)"           "archived in 0.33: needs isolate cgroup-mode (.NET CoreCLR incompatible with rlimit-mode -m / -f)"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Compiled (other)"

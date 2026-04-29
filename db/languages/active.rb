@@ -68,21 +68,8 @@
     compile_cmd: "/usr/local/gcc-9.5.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
     run_cmd: "./a.out"
   },
-  # C# moved from Mono to .NET 8 via dotnet-script (single-file scripting).
-  # NUGET_FALLBACK_PACKAGES points at the pre-warmed read-only cache baked
-  # into the image at /usr/local/share/dotnet-script-cache (NewtonDockerfile
-  # pre-warms during build) so dotnet build resolves NuGet refs from there
-  # without re-downloading. NUGET_PACKAGES (the writable location) defaults
-  # to /tmp/.nuget/packages via HOME=/tmp set by isolate. Without this
-  # the first run materialises ~200 MB of NuGet refs into /tmp and blows
-  # RLIMIT_FSIZE (signal 25, SIGXFSZ).
-  {
-    id: 51,
-    name: "C# (.NET 8)",
-    is_archived: false,
-    source_file: "Main.cs",
-    run_cmd: "NUGET_FALLBACK_PACKAGES=/usr/local/share/dotnet-script-cache/.nuget/packages DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-tools/dotnet-script Main.cs"
-  },
+  # id 51 (C# .NET 8) moved to archived.rb until isolate cgroup-mode lands.
+  # See archived.rb for context.
   {
     id: 52,
     name: "C++ (GCC 7.4.0)",
@@ -343,14 +330,8 @@
     source_file: "main.clj",
     run_cmd: "/usr/local/bin/java -cp /usr/local/clojure-1.12.0.1495/clojure.jar clojure.main main.clj"
   },
-  # F# id 87: see C# id 51 for DOTNET_ROOT rationale.
-  {
-    id: 87,
-    name: "F# (.NET 8)",
-    is_archived: false,
-    source_file: "script.fsx",
-    run_cmd: "NUGET_FALLBACK_PACKAGES=/usr/local/share/dotnet-script-cache/.nuget/packages DOTNET_ROOT=/usr/local/dotnet-sdk /usr/local/dotnet-sdk/dotnet fsi script.fsx"
-  },
+  # id 87 (F# .NET 8) moved to archived.rb until isolate cgroup-mode lands.
+  # See archived.rb for context.
   {
     id: 88,
     name: "Groovy (4.0.24)",
