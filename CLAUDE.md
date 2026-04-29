@@ -15,7 +15,7 @@ plus the `isolate` sandbox.
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
 | Compiler base | `newtonschool/judge0-newton-compiler:0.27` | what we layer on |
-| Sandbox | `isolate` v2.0 (cgroup v2 capable, currently rlimit mode) | from compilers image |
+| Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
 `NewtonDockerfile`) is **decoupled** from the Ruby that student
@@ -37,7 +37,7 @@ compilers image). Don't conflate them.
 │   ├── load-config                  # sources judge0.conf, sets RAILS env
 │   └── dev/{shell,bundle,clean,...} # dev helpers
 ├── bin/
-│   ├── newton-smoke-test            # 51-language end-to-end smoke test
+│   ├── newton-smoke-test            # 20-language end-to-end smoke test (post-trim)
 │   └── agricius                     # release tarball generator (rare use)
 ├── db/
 │   ├── languages/active.rb          # canonical language id → command map
@@ -138,9 +138,9 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Should report ~37
-PASS / 8 known-tuning FAIL / 6 SKIP (intentional skips). Failures are
-documented inline in `bin/newton-smoke-test` and in the PR that added it.
+Submits a hello-world for every active language id. Expected:
+**20 PASS / 0 FAIL / 0 SKIP** on amd64; **18 PASS / 0 FAIL / 2 SKIP** on
+arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 ## judge0.conf knobs (set during 0.26 modernisation)
 
@@ -149,8 +149,8 @@ in `judge0.conf` explain each. Summary:
 
 | Setting | Default | Newton | Why |
 |---|---|---|---|
-| `ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT` | false | **true** | so isolate runs without `--cg` (no systemd cgroup delegation needed) |
-| `ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT` | false | **true** | same |
+| `ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT` | false | `${OVERRIDE_PER_PROCESS_TIME:-true}` → flipped to `false` by `docker-entrypoint.sh` when cgroup-v2 setup succeeds, so `IsolateJob` adds `--cg` and isolate uses `cpu.stat` / `memory.max` (RSS) instead of `RLIMIT_CPU` / `RLIMIT_AS` |
+| `ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT` | false | same — flipped at runtime, gives RSS-based memory limits required for DSA per-question caps to be meaningful for JVM/Node/Python ML |
 | `MEMORY_LIMIT` | 128 MB | **8 GiB** | JVM 21 + Node 22 + numpy each pre-reserve >1 GiB |
 | `MAX_MEMORY_LIMIT` | 512 MB | **16 GiB** | per-submission memory_limit cap |
 | `MAX_PROCESSES_AND_OR_THREADS` | 60 | **2048** | JVM/Node thread pools |
@@ -164,11 +164,15 @@ in `judge0.conf` explain each. Summary:
    does `set -o allexport; source $CONFIG_FILE` which clobbers anything you
    pass via `docker-compose environment:`. Edit `judge0.conf` for sandbox
    tuning, not compose env.
-2. **isolate `--cg` mode requires `/run/isolate/cgroup`** which only exists
-   if `isolate-cg-keeper` (a systemd service) is running. In a non-systemd
-   container that fails with "Cannot open /run/isolate/cgroup". We rely on
-   per-process rlimits via `ENABLE_PER_PROCESS_*=true` (see above) so this
-   doesn't bite us.
+2. **isolate `--cg` mode normally requires `isolate-cg-keeper` (systemd
+   service) to populate `/run/isolate/cgroup`** — not available in
+   non-systemd containers. `docker-entrypoint.sh` substitutes for it: at
+   startup it lays out `/sys/fs/cgroup/{api.scope,isolate.slice}`, enables
+   `subtree_control`, and writes `/run/isolate/cgroup` pointing at
+   `isolate.slice`. The "no internal process constraint" is sidestepped
+   by moving Rails/Resque into `api.scope` first. If that setup fails
+   (cgroup v1 host, non-privileged container), the entrypoint falls back
+   silently to rlimit mode.
 3. **isolate command in `app/jobs/isolate_job.rb` doesn't expose `-O`
    (open files).** R and Go submissions hit RLIMIT_NOFILE. Adding it
    would mean editing IsolateJob and adding a `MAX_OPEN_FILES` knob to
