@@ -118,7 +118,6 @@ class IsolateJob < ApplicationJob
     -k #{Config::MAX_STACK_LIMIT} \
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
     --open-files=#{Config::MAX_MAX_OPEN_FILES} \
-    #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : "--cg-timing"} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{Config::MAX_MEMORY_LIMIT} \
     -f #{Config::MAX_EXTRACT_SIZE} \
     --run \
@@ -165,7 +164,6 @@ class IsolateJob < ApplicationJob
     -k #{Config::MAX_STACK_LIMIT} \
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
     --open-files=#{Config::MAX_MAX_OPEN_FILES} \
-    #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : "--cg-timing"} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{Config::MAX_MEMORY_LIMIT} \
     -f #{Config::MAX_MAX_FILE_SIZE} \
     -E HOME=/tmp \
@@ -239,7 +237,6 @@ class IsolateJob < ApplicationJob
     -k #{submission.stack_limit} \
     -p#{submission.max_processes_and_or_threads} \
     --open-files=#{Config::MAX_OPEN_FILES} \
-    #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : "--cg-timing"} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{submission.memory_limit} \
     -f #{submission.max_file_size} \
     -E HOME=/tmp \
