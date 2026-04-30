@@ -58,9 +58,21 @@ class IsolateJob < ApplicationJob
 
   private
 
+  # Languages where the Go-style cgroup `cpu.stat` over-accounting hits
+  # us — the kernel charges mmap/page-table setup across CPUs to the
+  # cgroup's system_usec, inflating reported CPU time by ~1000x for
+  # the runtime startup. Force these into rlimit mode so they use
+  # wait3-based per-process CPU accounting instead. Memory limits go
+  # back to RLIMIT_AS (virtual) for these — fine because their
+  # virtual footprint is small (Go: ~tens of MB).
+  CGROUP_INCOMPATIBLE_LANGUAGE_IDS = [60].freeze  # 60 = Go 1.23.4
+
   def initialize_workdir
     @box_id = submission.id%2147483647
-    @cgroups = (!submission.enable_per_process_and_thread_time_limit || !submission.enable_per_process_and_thread_memory_limit) ? "--cg" : ""
+    use_cg = (!submission.enable_per_process_and_thread_time_limit ||
+              !submission.enable_per_process_and_thread_memory_limit) &&
+             !CGROUP_INCOMPATIBLE_LANGUAGE_IDS.include?(submission.language_id)
+    @cgroups = use_cg ? "--cg" : ""
     @workdir = `isolate #{cgroups} -b #{box_id} --init`.chomp
     @boxdir = workdir + "/box"
     @tmpdir = workdir + "/tmp"
