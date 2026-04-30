@@ -155,13 +155,13 @@
           }
         },
         {
-          "name": "C GCC 14.2 (1001)",
+          "name": "C GCC 14.2 (3003)",
           "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 1001,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3003,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
           }
         },
         {
@@ -175,13 +175,13 @@
           }
         },
         {
-          "name": "C++ GCC 14.2 (1002)",
+          "name": "C++ GCC 14.2 (3004)",
           "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 1002,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3004,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
           }
         }
       ]

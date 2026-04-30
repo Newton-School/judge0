@@ -86,8 +86,8 @@ language ids exist and what they invoke. Editing it requires a
   sandbox → `pthread_create EAGAIN`.
 - **GCC id 50 (C) / 54 (C++)** alias to `/usr/local/gcc-9.5.0/...` —
   the legacy compiler kept alongside GCC 14 for back-compat with old
-  student code. New submissions should use **id 1001 (C / GCC 14.2.0)**
-  or **id 1002 (C++ / GCC 14.2.0)**.
+  student code. New submissions should use **id 3003 (C / GCC 14.2.0)**
+  or **id 3004 (C++ / GCC 14.2.0)**.
 
 ## Build commands
 

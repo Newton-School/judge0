@@ -25,7 +25,7 @@
     run_cmd: "./main"
   },
   # id 50 (C / GCC 9.5.0) is the legacy compiler kept in the image alongside
-  # GCC 14. New submissions should prefer id 1001 (C / GCC 14.2.0). Lenient
+  # GCC 14. New submissions should prefer id 3003 (C / GCC 14.2.0). Lenient
   # flags soften GCC-9-vs-GCC-14 warning-promoted-to-error breakage where a
   # student's old code is eventually re-run on the modern compiler.
   {
@@ -113,7 +113,7 @@
   # New IDs for current GCC 14 — same lenient flags so new student code is
   # tolerant of legacy idioms while new submissions get the modern compiler.
   {
-    id: 1001,
+    id: 3003,
     name: "C (GCC 14.2.0)",
     is_archived: false,
     source_file: "main.c",
@@ -121,7 +121,7 @@
     run_cmd: "./a.out"
   },
   {
-    id: 1002,
+    id: 3004,
     name: "C++ (GCC 14.2.0)",
     is_archived: false,
     source_file: "main.cpp",
