@@ -44,13 +44,19 @@
     compile_cmd: "/usr/local/gcc-9.5.0/bin/g++ %s main.cpp",
     run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-9.5.0/lib64 ./a.out"
   },
+  # GOMAXPROCS=2: Go's runtime auto-detects CPUs from /proc/cpuinfo (host),
+  # not cgroup CPU shares. Under isolate cgroup-mode, CPU time is summed
+  # across all threads (cpu.stat aggregate), so an unconstrained Go runtime
+  # spawns one OS thread per host vCPU and aggregate init CPU easily trips
+  # the -t cpu-time-limit even for hello-world. Pinning to 2 keeps DSA
+  # semantics single-thread-ish while leaving headroom for runtime/GC.
   {
     id: 60,
     name: "Go (1.23.4)",
     is_archived: false,
     source_file: "main.go",
     compile_cmd: "GOCACHE=/tmp/.cache/go-build /usr/local/go-1.23.4/bin/go build %s main.go",
-    run_cmd: "./main"
+    run_cmd: "GOMAXPROCS=2 ./main"
   },
   {
     id: 62,
