@@ -2,14 +2,28 @@
 #
 # Newton-owned bounds test for the judge0 API.
 #
-# Probes time + memory enforcement for 6 mainstream languages in two modes:
+# Probes time + memory enforcement across active languages, in two modes:
 #   - sync  (POST?wait=true)              — exercises the API request path
 #   - async (POST?wait=false + GET poll)  — exercises the queue + worker path
 #
-# For each language we submit:
+# For each language we submit (where applicable):
 #   - hello world (default limits)         → expect Accepted
 #   - busy loop (cpu_time_limit=1)         → expect Time Limit Exceeded
 #   - 200 MB alloc (memory_limit=65536 KB) → expect Runtime Error (cgroup-v2 OOM kill)
+#
+# Coverage: every active language that has natural busy-loop / alloc semantics.
+# Skipped intentionally:
+#   - 3000 HDL  / 3002 Jack — deterministic simulators driven by stdin harnesses;
+#                              no general-purpose looping or alloc primitives.
+# Partially covered:
+#   - 45 NASM   — HELLO + TLE  (raw-asm OOM via brk/mmap is impractical here)
+#   - 46 Bash   — HELLO + TLE  (bash mass-alloc is awkward)
+#   - 82 SQL    — HELLO + TLE  (SQLite mass-alloc not single-statement-friendly)
+#   - 3001 MIPS — HELLO + TLE  (Mars heap syscalls heavy)
+#
+# Known regression: id 60 Go fails HELLO under cgroup mode due to cpu.stat
+# over-accounting Go runtime startup. Tracked separately; included here on
+# purpose so the test reflects current state.
 #
 # Usage:
 #   ./bin/newton-bounds-test                                        # localhost
@@ -83,23 +97,16 @@ run() {
 }
 
 # ── source codes ──
-PY_HELLO='print("Hello, Newton!")'
-PY_TLE='while True: pass'
-PY_OOM='x = bytearray(200 * 1024 * 1024)
-for i in range(0, len(x), 4096): x[i] = 1
-print(len(x))'
+BASH_HELLO='echo "Hello, Newton!"'
+BASH_TLE='while true; do :; done'
 
-JAVA_HELLO='public class Main { public static void main(String[] a) { System.out.println("Hello, Newton!"); } }'
-JAVA_TLE='public class Main { public static void main(String[] a) { while(true){} } }'
-JAVA_OOM='public class Main { public static void main(String[] a) { byte[] x = new byte[200*1024*1024]; for (int i = 0; i < x.length; i += 4096) x[i] = 1; System.out.println(x.length); } }'
-
-NODE_HELLO='console.log("Hello, Newton!");'
-NODE_TLE='while(true){}'
-NODE_OOM='const x = new Uint8Array(200*1024*1024); for (let i = 0; i < x.length; i += 4096) x[i] = 1; console.log(x.length);'
-
-RUBY_HELLO='puts "Hello, Newton!"'
-RUBY_TLE='loop {}'
-RUBY_OOM='x = "a" * (200 * 1024 * 1024); puts x.size'
+FBASIC_HELLO='print "Hello, Newton!"'
+FBASIC_TLE='do : loop'
+FBASIC_OOM='dim shared as byte x(0 to 200*1024*1024)
+for i as long = 0 to 200*1024*1024 step 4096
+    x(i) = 1
+next
+print x(0)'
 
 C_HELLO='#include <stdio.h>
 int main(){ printf("Hello, Newton!\n"); return 0; }'
@@ -117,6 +124,92 @@ CPP_OOM='#include <vector>
 #include <iostream>
 int main(){ std::vector<char> x(200L*1024*1024, 1); std::cout << x.size() << std::endl; return 0; }'
 
+GO_HELLO='package main
+import "fmt"
+func main() { fmt.Println("Hello, Newton!") }'
+GO_TLE='package main
+func main() { for {} }'
+GO_OOM='package main
+import "fmt"
+func main() {
+    x := make([]byte, 200*1024*1024)
+    for i := 0; i < len(x); i += 4096 { x[i] = 1 }
+    fmt.Println(len(x))
+}'
+
+JAVA_HELLO='public class Main { public static void main(String[] a) { System.out.println("Hello, Newton!"); } }'
+JAVA_TLE='public class Main { public static void main(String[] a) { while(true){} } }'
+JAVA_OOM='public class Main { public static void main(String[] a) { byte[] x = new byte[200*1024*1024]; for (int i = 0; i < x.length; i += 4096) x[i] = 1; System.out.println(x.length); } }'
+
+PY_HELLO='print("Hello, Newton!")'
+PY_TLE='while True: pass'
+PY_OOM='x = bytearray(200 * 1024 * 1024)
+for i in range(0, len(x), 4096): x[i] = 1
+print(len(x))'
+
+RUBY_HELLO='puts "Hello, Newton!"'
+RUBY_TLE='loop {}'
+RUBY_OOM='x = "a" * (200 * 1024 * 1024); puts x.size'
+
+RUST_HELLO='fn main() { println!("Hello, Newton!"); }'
+RUST_TLE='use std::hint::black_box;
+fn main() { let mut i: u64 = 0; loop { i = i.wrapping_add(1); black_box(&i); } }'
+RUST_OOM='fn main() {
+    let mut v: Vec<u8> = vec![0u8; 200*1024*1024];
+    let mut i = 0;
+    while i < v.len() { v[i] = 1; i += 4096; }
+    println!("{}", v.len());
+}'
+
+TS_HELLO='console.log("Hello, Newton!");'
+TS_TLE='while(true){}'
+TS_OOM='const x = new Uint8Array(200*1024*1024); for (let i = 0; i < x.length; i += 4096) x[i] = 1; console.log(x.length);'
+
+R_HELLO='cat("Hello, Newton!\n")'
+R_TLE='while(TRUE) { x <- 1 }'
+R_OOM='x <- raw(200 * 1024 * 1024); cat(length(x), "\n")'
+
+NODE_HELLO='console.log("Hello, Newton!");'
+NODE_TLE='while(true){}'
+NODE_OOM='const x = new Uint8Array(200*1024*1024); for (let i = 0; i < x.length; i += 4096) x[i] = 1; console.log(x.length);'
+
+SQL_HELLO="SELECT 'Hello, Newton!';"
+# Unbounded recursive CTE — SQLite materializes; will TLE before OOM
+SQL_TLE="WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT count(*) FROM c;"
+
+# x86_64 Linux syscall hello world (matches smoke test pattern)
+NASM_HELLO='section .data
+    msg db "Hello, Newton!", 10
+    len equ $ - msg
+section .text
+global _start
+_start:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, msg
+    mov rdx, len
+    syscall
+    mov rax, 60
+    xor rdi, rdi
+    syscall'
+NASM_TLE='section .text
+global _start
+_start:
+    jmp _start'
+
+MIPS_HELLO='        .data
+msg:    .asciiz "Hello, Newton!\n"
+        .text
+main:
+        li      $v0, 4
+        la      $a0, msg
+        syscall
+        li      $v0, 10
+        syscall'
+MIPS_TLE='        .text
+main:
+loop:   b loop'
+
 # ── plan ──
 TLE_OPTS='{"cpu_time_limit":1,"wall_time_limit":5}'
 OOM_OPTS='{"memory_limit":65536}'   # 64 MB cap; programs alloc 200 MB
@@ -129,28 +222,60 @@ for mode in sync async; do
   echo "═══ Mode: ${mode} ═══"
 
   echo "── Hello world (default limits) ──"
-  run "Python 71"        "$mode" 'Accepted' 71   "$PY_HELLO"
+  run "NASM 45"          "$mode" 'Accepted' 45   "$NASM_HELLO"
+  run "Bash 46"          "$mode" 'Accepted' 46   "$BASH_HELLO"
+  run "FreeBASIC 47"     "$mode" 'Accepted' 47   "$FBASIC_HELLO"
+  run "C GCC9.5 50"      "$mode" 'Accepted' 50   "$C_HELLO"
+  run "C++ GCC9.5 54"    "$mode" 'Accepted' 54   "$CPP_HELLO"
+  run "Go 60"            "$mode" 'Accepted' 60   "$GO_HELLO"
   run "Java 62"          "$mode" 'Accepted' 62   "$JAVA_HELLO"
-  run "Node.js 1999"     "$mode" 'Accepted' 1999 "$NODE_HELLO"
+  run "Python 71"        "$mode" 'Accepted' 71   "$PY_HELLO"
   run "Ruby 72"          "$mode" 'Accepted' 72   "$RUBY_HELLO"
+  run "Rust 73"          "$mode" 'Accepted' 73   "$RUST_HELLO"
+  run "TypeScript 74"    "$mode" 'Accepted' 74   "$TS_HELLO"
+  run "R 80"             "$mode" 'Accepted' 80   "$R_HELLO"
+  run "SQL 82"           "$mode" 'Accepted' 82   "$SQL_HELLO"
+  run "Node.js 1999"     "$mode" 'Accepted' 1999 "$NODE_HELLO"
+  run "Python ML 2000"   "$mode" 'Accepted' 2000 "$PY_HELLO"
+  run "MIPS 3001"        "$mode" 'Accepted' 3001 "$MIPS_HELLO"
   run "C GCC14 3003"     "$mode" 'Accepted' 3003 "$C_HELLO"
   run "C++ GCC14 3004"   "$mode" 'Accepted' 3004 "$CPP_HELLO"
 
   echo "── TLE: cpu_time_limit=1, busy loop ──"
-  run "Python TLE"       "$mode" 'Time Limit'  71   "$PY_TLE"   "$TLE_OPTS"
-  run "Java TLE"         "$mode" 'Time Limit'  62   "$JAVA_TLE" "$TLE_OPTS"
-  run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE" "$TLE_OPTS"
-  run "Ruby TLE"         "$mode" 'Time Limit'  72   "$RUBY_TLE" "$TLE_OPTS"
-  run "C TLE"            "$mode" 'Time Limit'  3003 "$C_TLE"    "$TLE_OPTS"
-  run "C++ TLE"          "$mode" 'Time Limit'  3004 "$CPP_TLE"  "$TLE_OPTS"
+  run "NASM TLE"         "$mode" 'Time Limit'  45   "$NASM_TLE"   "$TLE_OPTS"
+  run "Bash TLE"         "$mode" 'Time Limit'  46   "$BASH_TLE"   "$TLE_OPTS"
+  run "FreeBASIC TLE"    "$mode" 'Time Limit'  47   "$FBASIC_TLE" "$TLE_OPTS"
+  run "C9.5 TLE"         "$mode" 'Time Limit'  50   "$C_TLE"      "$TLE_OPTS"
+  run "C++9.5 TLE"       "$mode" 'Time Limit'  54   "$CPP_TLE"    "$TLE_OPTS"
+  run "Go TLE"           "$mode" 'Time Limit'  60   "$GO_TLE"     "$TLE_OPTS"
+  run "Java TLE"         "$mode" 'Time Limit'  62   "$JAVA_TLE"   "$TLE_OPTS"
+  run "Python TLE"       "$mode" 'Time Limit'  71   "$PY_TLE"     "$TLE_OPTS"
+  run "Ruby TLE"         "$mode" 'Time Limit'  72   "$RUBY_TLE"   "$TLE_OPTS"
+  run "Rust TLE"         "$mode" 'Time Limit'  73   "$RUST_TLE"   "$TLE_OPTS"
+  run "TypeScript TLE"   "$mode" 'Time Limit'  74   "$TS_TLE"     "$TLE_OPTS"
+  run "R TLE"            "$mode" 'Time Limit'  80   "$R_TLE"      "$TLE_OPTS"
+  run "SQL TLE"          "$mode" 'Time Limit'  82   "$SQL_TLE"    "$TLE_OPTS"
+  run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE"   "$TLE_OPTS"
+  run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"     "$TLE_OPTS"
+  run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"   "$TLE_OPTS"
+  run "C14 TLE"          "$mode" 'Time Limit'  3003 "$C_TLE"      "$TLE_OPTS"
+  run "C++14 TLE"        "$mode" 'Time Limit'  3004 "$CPP_TLE"    "$TLE_OPTS"
 
   echo "── OOM: memory_limit=65536 (64 MB), alloc 200 MB ──"
-  run "Python OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 71   "$PY_OOM"   "$OOM_OPTS"
-  run "Java OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 62   "$JAVA_OOM" "$OOM_OPTS"
-  run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM" "$OOM_OPTS"
-  run "Ruby OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 72   "$RUBY_OOM" "$OOM_OPTS"
-  run "C OOM"            "$mode" 'Runtime Error|Memory Limit|Killed' 3003 "$C_OOM"    "$OOM_OPTS"
-  run "C++ OOM"          "$mode" 'Runtime Error|Memory Limit|Killed' 3004 "$CPP_OOM"  "$OOM_OPTS"
+  run "FreeBASIC OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 47   "$FBASIC_OOM" "$OOM_OPTS"
+  run "C9.5 OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 50   "$C_OOM"      "$OOM_OPTS"
+  run "C++9.5 OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 54   "$CPP_OOM"    "$OOM_OPTS"
+  run "Go OOM"           "$mode" 'Runtime Error|Memory Limit|Killed' 60   "$GO_OOM"     "$OOM_OPTS"
+  run "Java OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 62   "$JAVA_OOM"   "$OOM_OPTS"
+  run "Python OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 71   "$PY_OOM"     "$OOM_OPTS"
+  run "Ruby OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 72   "$RUBY_OOM"   "$OOM_OPTS"
+  run "Rust OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 73   "$RUST_OOM"   "$OOM_OPTS"
+  run "TypeScript OOM"   "$mode" 'Runtime Error|Memory Limit|Killed' 74   "$TS_OOM"     "$OOM_OPTS"
+  run "R OOM"            "$mode" 'Runtime Error|Memory Limit|Killed' 80   "$R_OOM"      "$OOM_OPTS"
+  run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"   "$OOM_OPTS"
+  run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"     "$OOM_OPTS"
+  run "C14 OOM"          "$mode" 'Runtime Error|Memory Limit|Killed' 3003 "$C_OOM"      "$OOM_OPTS"
+  run "C++14 OOM"        "$mode" 'Runtime Error|Memory Limit|Killed' 3004 "$CPP_OOM"    "$OOM_OPTS"
 
   echo
 done
