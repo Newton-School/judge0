@@ -324,7 +324,7 @@
   {
     id: 63,
     name: "JavaScript (Node.js 12.14.0)",
-    is_archived: false,
+    is_archived: true,
     source_file: "script.js",
     run_cmd: "/usr/local/node-12.14.0/bin/node script.js"
   },
