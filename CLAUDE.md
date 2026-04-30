@@ -94,11 +94,11 @@ language ids exist and what they invoke. Editing it requires a
 ```bash
 # arm64 (Mac dev)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.62 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.63 --load .
 
 # amd64 (EC2 / prod)
 docker buildx build --platform linux/amd64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.62 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.63 --load .
 ```
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
@@ -112,7 +112,7 @@ images are old and may not start on current Docker Desktop, so:
 ```bash
 # Build the app image first (once, then re-run only when Gemfile/Dockerfile changes)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.62 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.63 --load .
 
 # Bring up only the essentials (skip nginx + resque-web + pgbouncer)
 docker compose -f docker-compose.dev.yml up -d judge0 db redis redis-sidecar
@@ -205,7 +205,8 @@ in `judge0.conf` explain each. Summary:
 - Phase-3 trim tag: `0.59` (compiler base 0.27, 25 low-usage langs archived) — superseded
 - Phase-4 cgroup-mode tag: `0.60` (isolate v2 cgroup-v2 enforcement, RSS-based memory limits) — superseded
 - Phase-4 bounds tag: `0.61` (language id rename 1001/1002 → 3003/3004, bounds-test, `--open-files` knob) — superseded
-- Phase-4 cgroup-reset tag: `0.62` (reset cgroup between compile and run to fix cpu.stat / memory.peak leak from compile into run) — current
+- Phase-4 cgroup-reset tag: `0.62` (reset cgroup between compile and run to fix cpu.stat / memory.peak leak from compile into run) — superseded
+- Phase-4 Node-12 archive tag: `0.63` (correctly archive id 63 Node 12.14.0 — was leaking back as active on every pod boot due to a stray `is_archived: false`) — current
 - Production currently runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
   unrelated to Docker Hub tags. Modernisation will roll prod after staging soak.
 
