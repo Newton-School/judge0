@@ -29,6 +29,7 @@ class IsolateJob < ApplicationJob
         cleanup
         return
       end
+      reset_cgroup_for_run
       run
       verify
 
@@ -309,6 +310,42 @@ class IsolateJob < ApplicationJob
   def reset_metadata_file
     `sudo rm -rf #{metadata_file}`
     initialize_file(metadata_file)
+  end
+
+  # cgroup-v2 cpu.stat (usage_usec) and memory.peak are cumulative since
+  # cgroup creation and not resettable. Compile and run share the same box
+  # (and thus cgroup), so compile's CPU and peak RSS leak into the run's
+  # reported `time` / `memory`, and worse, isolate's TLE sampler reads
+  # cpu.stat against `-t cpu_time_limit` and kills run the moment cpu.stat
+  # exceeds the limit -- even before run has consumed any CPU. Heavy
+  # compiles (Go especially) make hello-world TLE.
+  #
+  # Workaround: snapshot the box, destroy and recreate the cgroup, restore
+  # the box. Run then sees a fresh cpu.stat=0 / memory.peak=0.
+  # Skipped for rlimit mode (getrusage is per-process; no leak) and for
+  # languages with no compile step (cgroup is already pristine).
+  def reset_cgroup_for_run
+    return unless cgroups.present?
+    return unless submission.is_project || submission.language.compile_cmd.present?
+
+    puts "[#{DateTime.now}] Resetting cgroup for submission #{submission.token} (#{submission.id})"
+
+    snapshot = "/tmp/judge0-snap-#{box_id}"
+    `sudo rm -rf #{snapshot}`
+    `sudo cp -a #{boxdir} #{snapshot}`
+
+    stdin_data = File.binread(stdin_file)
+
+    `isolate #{cgroups} -b #{box_id} --cleanup`
+    @workdir = `isolate #{cgroups} -b #{box_id} --init`.chomp
+
+    `sudo rm -rf #{boxdir}`
+    `sudo mv #{snapshot} #{boxdir}`
+
+    [stdin_file, stdout_file, stderr_file, metadata_file].each do |f|
+      initialize_file(f)
+    end
+    File.open(stdin_file, "wb") { |f| f.write(stdin_data) }
   end
 
   def fix_permissions
