@@ -8,130 +8,109 @@ Probe definitions:
 - **TLE**: busy loop with `cpu_time_limit=1`, `wall_time_limit=5` → expect `Time Limit Exceeded`
 - **OOM**: 200 MB allocation with `memory_limit=65536` (64 MB) → expect `Runtime Error (NZEC)` (cgroup OOM kill)
 
-Probe coverage in `bin/newton-bounds-test` is unchanged from the 0.62 run: still the 18 HELLO / 18 TLE / 14 OOM matrix. The 0.64 language-set changes (Plain Text id 43, Kotlin id 78, Scala id 81 added; GCC 14 ids 3003/3004 archived) are reflected in the smoke test (`bin/newton-smoke-test` — **21 / 0 / 0** on staging) but not yet in the bounds test. See *Notes* below.
+Probe coverage in `bin/newton-bounds-test` updated for the 0.64 / 0.28-base language set:
+- **Removed**: GCC 14 ids 3003 / 3004 (archived in active.rb).
+- **Added**: Plain Text 43 (HELLO only — `cat`-based, no busy-loop / alloc), Kotlin 78 (HELLO + TLE + OOM), Scala 3 81 (HELLO + TLE + OOM).
+- **Total**: 19 HELLO + 18 TLE + 14 OOM = 51 probes × 2 modes = 102 cells.
 
 ## HELLO
 
 | Lang | sync prod | sync staging | async prod | async staging |
 |---|---|---|---|---|
-| NASM 45 | ✓ Accepted (t=0.002 · m=2948) | ✓ Accepted (t=0.002 · m=1104) | ✓ Accepted (t=0.002 · m=2356) | ✓ Accepted (t=0.002 · m=1020) |
-| Bash 46 | ✓ Accepted (t=0.004 · m=2012) | ✓ Accepted (t=0.003 · m=952) | ✓ Accepted (t=0.004 · m=2008) | ✓ Accepted (t=0.003 · m=1148) |
-| FreeBASIC 47 | ✓ Accepted (t=0.003 · m=20288) | ✓ Accepted (t=0.003 · m=1200) | ✓ Accepted (t=0.002 · m=19816) | ✓ Accepted (t=0.003 · m=1144) |
-| C GCC9.5 50 | ✓ Accepted (t=0.002 · m=3840) | ✓ Accepted (t=0.002 · m=824) | ✓ Accepted (t=0.002 · m=720) | ✓ Accepted (t=0.003 · m=1100) |
-| C++ GCC9.5 54 | ✓ Accepted (t=0.003 · m=1576) | ✓ Accepted (t=0.003 · m=1140) | ✓ Accepted (t=0.003 · m=848) | ✓ Accepted (t=0.004 · m=1016) |
-| Go 60 | ✓ Accepted (t=0.003 · m=4712) | ✓ Accepted (t=0.004 · m=3188) | ✓ Accepted (t=0.003 · m=3812) | ✓ Accepted (t=0.004 · m=2956) |
-| Java 62 | ✓ Accepted (t=0.048 · m=10632) | ✓ Accepted (t=0.04 · m=19880) | ✓ Accepted (t=0.047 · m=10512) | ✓ Accepted (t=0.041 · m=19920) |
-| Python 71 | ✓ Accepted (t=0.012 · m=3524) | ✓ Accepted (t=0.014 · m=3472) | ✓ Accepted (t=0.017 · m=3448) | ✓ Accepted (t=0.014 · m=3532) |
-| Ruby 72 | ✓ Accepted (t=0.046 · m=9056) | ✓ Accepted (t=0.059 · m=6376) | ✓ Accepted (t=0.043 · m=9156) | ✓ Accepted (t=0.064 · m=6256) |
-| Rust 73 | ✓ Accepted (t=0.002 · m=127924) | ✓ Accepted (t=0.003 · m=1164) | ✓ Accepted (t=0.002 · m=127880) | ✓ Accepted (t=0.003 · m=1312) |
-| TypeScript 74 | ✓ Accepted (t=0.034 · m=8364) | ✓ Accepted (t=0.026 · m=7920) | ✓ Accepted (t=0.026 · m=8004) | ✓ Accepted (t=0.026 · m=8156) |
-| R 80 | ✓ Accepted (t=0.169 · m=60500) | ✓ Accepted (t=0.167 · m=43140) | ✓ Accepted (t=0.169 · m=60624) | ✓ Accepted (t=0.167 · m=42996) |
-| SQL 82 | ✓ Accepted (t=0.005 · m=2528) | ✓ Accepted (t=0.005 · m=1352) | ✓ Accepted (t=0.005 · m=2540) | ✓ Accepted (t=0.004 · m=1592) |
-| Node.js 1999 | ✓ Accepted (t=0.045 · m=8020) | ✓ Accepted (t=0.025 · m=8312) | ✓ Accepted (t=0.027 · m=7948) | ✓ Accepted (t=0.025 · m=8376) |
-| Python ML 2000 | ✓ Accepted (t=0.017 · m=4708) | ✓ Accepted (t=0.013 · m=3772) | ✓ Accepted (t=0.014 · m=3416) | ✓ Accepted (t=0.014 · m=3772) |
-| MIPS 3001 | ✓ Accepted (t=1.135 · m=52016) | ✓ Accepted (t=1.08 · m=53268) | ✓ Accepted (t=1.169 · m=50108) | ✓ Accepted (t=1.055 · m=53668) |
-| C GCC14 3003 | ✗ ? | ✗ ? | ✗ NO TOKEN | ✗ NO TOKEN |
-| C++ GCC14 3004 | ✗ ? | ✗ ? | ✗ NO TOKEN | ✗ NO TOKEN |
+| Plain Text 43 | ✓ Accepted (t=0.002 · m=684) | ✓ Accepted (t=0.003 · m=1020) | ✓ Accepted (t=0.002 · m=820) | ✓ Accepted (t=0.003 · m=840) |
+| NASM 45 | ✓ Accepted (t=0.002 · m=3092) | ✓ Accepted (t=0.002 · m=1020) | ✓ Accepted (t=0.001 · m=2304) | ✓ Accepted (t=0.002 · m=848) |
+| Bash 46 | ✓ Accepted (t=0.004 · m=2060) | ✓ Accepted (t=0.003 · m=1148) | ✓ Accepted (t=0.004 · m=2040) | ✓ Accepted (t=0.004 · m=1104) |
+| FreeBASIC 47 | ✓ Accepted (t=0.002 · m=3196) | ✓ Accepted (t=0.003 · m=1020) | ✓ Accepted (t=0.002 · m=1256) | ✓ Accepted (t=0.003 · m=1100) |
+| C GCC9.5 50 | ✓ Accepted (t=0.003 · m=4240) | ✓ Accepted (t=0.002 · m=1020) | ✓ Accepted (t=0.002 · m=740) | ✓ Accepted (t=0.002 · m=1020) |
+| C++ GCC9.5 54 | ✓ Accepted (t=0.003 · m=3520) | ✓ Accepted (t=0.003 · m=1148) | ✓ Accepted (t=0.003 · m=804) | ✓ Accepted (t=0.004 · m=1076) |
+| Go 60 | ✓ Accepted (t=0.002 · m=8512) | ✓ Accepted (t=0.004 · m=3332) | ✓ Accepted (t=0.003 · m=5912) | ✓ Accepted (t=0.004 · m=3368) |
+| Java 62 | ✓ Accepted (t=0.048 · m=12780) | ✓ Accepted (t=0.042 · m=19840) | ✓ Accepted (t=0.047 · m=13064) | ✓ Accepted (t=0.04 · m=20332) |
+| Python 71 | ✓ Accepted (t=0.013 · m=3472) | ✓ Accepted (t=0.014 · m=3512) | ✓ Accepted (t=0.012 · m=3500) | ✓ Accepted (t=0.014 · m=3508) |
+| Ruby 72 | ✓ Accepted (t=0.044 · m=9116) | ✓ Accepted (t=0.059 · m=6088) | ✓ Accepted (t=0.044 · m=9468) | ✓ Accepted (t=0.062 · m=5920) |
+| Rust 73 | ✓ Accepted (t=0.002 · m=6176) | ✓ Accepted (t=0.003 · m=1392) | ✓ Accepted (t=0.002 · m=4244) | ✓ Accepted (t=0.003 · m=1204) |
+| TypeScript 74 | ✓ Accepted (t=0.045 · m=7960) | ✓ Accepted (t=0.027 · m=7616) | ✓ Accepted (t=0.027 · m=8024) | ✓ Accepted (t=0.025 · m=8372) |
+| Kotlin 78 | ✓ Accepted (t=0.105 · m=72832) | ✓ Accepted (t=0.184 · m=29532) | ✓ Accepted (t=0.101 · m=66604) | ✓ Accepted (t=0.183 · m=29848) |
+| R 80 | ✓ Accepted (t=0.169 · m=50056) | ✓ Accepted (t=0.165 · m=43756) | ✓ Accepted (t=0.144 · m=45548) | ✓ Accepted (t=0.165 · m=44272) |
+| Scala 81 | ✓ Accepted (t=0.772 · m=58604) | ✓ Accepted (t=0.251 · m=33764) | ✓ Accepted (t=0.8 · m=69712) | ✓ Accepted (t=0.244 · m=33756) |
+| SQL 82 | ✓ Accepted (t=0.005 · m=2520) | ✓ Accepted (t=0.004 · m=1612) | ✓ Accepted (t=0.005 · m=2572) | ✓ Accepted (t=0.004 · m=1436) |
+| Node.js 1999 | ✓ Accepted (t=0.033 · m=14928) | ✓ Accepted (t=0.026 · m=8080) | ✓ Accepted (t=0.027 · m=8364) | ✓ Accepted (t=0.027 · m=7860) |
+| Python ML 2000 | ✓ Accepted (t=0.015 · m=5704) | ✓ Accepted (t=0.013 · m=3772) | ✓ Accepted (t=0.015 · m=3532) | ✓ Accepted (t=0.013 · m=3724) |
+| MIPS 3001 | ✓ Accepted (t=1.111 · m=50384) | ✓ Accepted (t=1.081 · m=52916) | ✓ Accepted (t=1.295 · m=53640) | ✓ Accepted (t=1.064 · m=53204) |
 
 ## TLE
 
 | Lang | sync prod | sync staging | async prod | async staging |
 |---|---|---|---|---|
-| NASM TLE | ✓ Time Limit Exceeded (t=2.535 · m=2892) | ✓ Time Limit Exceeded (t=5.099 · m=820) | ✓ Time Limit Exceeded (t=5.072 · m=696) | ✓ Time Limit Exceeded (t=5.026 · m=840) |
-| Bash TLE | ✓ Time Limit Exceeded (t=2.508 · m=1996) | ✓ Time Limit Exceeded (t=5.044 · m=960) | ✓ Time Limit Exceeded (t=5.063 · m=1392) | ✓ Time Limit Exceeded (t=5.031 · m=1020) |
-| FreeBASIC TLE | ✓ Time Limit Exceeded (t=2.496 · m=2520) | ✓ Time Limit Exceeded (t=5.011 · m=944) | ✓ Time Limit Exceeded (t=5.063 · m=848) | ✓ Time Limit Exceeded (t=5.099 · m=940) |
-| C9.5 TLE | ✓ Time Limit Exceeded (t=2.498 · m=3980) | ✓ Time Limit Exceeded (t=5.031 · m=1276) | ✓ Time Limit Exceeded (t=5.067 · m=712) | ✓ Time Limit Exceeded (t=5.045 · m=760) |
-| C++9.5 TLE | ✓ Time Limit Exceeded (t=2.476 · m=1256) | ✓ Time Limit Exceeded (t=5.025 · m=844) | ✓ Time Limit Exceeded (t=5.067 · m=716) | ✓ Time Limit Exceeded (t=5.049 · m=1016) |
-| Go TLE | ✓ Time Limit Exceeded (t=2.511 · m=4220) | ✓ Time Limit Exceeded (t=5.073 · m=2760) | ✓ Time Limit Exceeded (t=5.073 · m=3088) | ✓ Time Limit Exceeded (t=5.055 · m=2936) |
-| Java TLE | ✓ Time Limit Exceeded (t=2.507 · m=10408) | ✓ Time Limit Exceeded (t=5.101 · m=19836) | ✓ Time Limit Exceeded (t=5.074 · m=10452) | ✓ Time Limit Exceeded (t=5.061 · m=20316) |
-| Python TLE | ✓ Time Limit Exceeded (t=2.532 · m=3364) | ✓ Time Limit Exceeded (t=5.023 · m=3492) | ✓ Time Limit Exceeded (t=5.076 · m=3440) | ✓ Time Limit Exceeded (t=5.053 · m=3772) |
-| Ruby TLE | ✓ Time Limit Exceeded (t=2.501 · m=9068) | ✓ Time Limit Exceeded (t=5.005 · m=5952) | ✓ Time Limit Exceeded (t=5.075 · m=9092) | ✓ Time Limit Exceeded (t=5.019 · m=6368) |
-| Rust TLE | ✗ Compilation Error | ✓ Time Limit Exceeded (t=5.054 · m=1160) | ✗ Compilation Error | ✓ Time Limit Exceeded (t=5.061 · m=1196) |
-| TypeScript TLE | ✓ Time Limit Exceeded (t=2.511 · m=9884) | ✓ Time Limit Exceeded (t=5.056 · m=7960) | ✓ Time Limit Exceeded (t=5.07 · m=8104) | ✓ Time Limit Exceeded (t=5.032 · m=8168) |
-| R TLE | ✓ Time Limit Exceeded (t=2.537 · m=64360) | ✓ Time Limit Exceeded (t=5.102 · m=64548) | ✓ Time Limit Exceeded (t=5.059 · m=64332) | ✓ Time Limit Exceeded (t=5.047 · m=64548) |
-| SQL TLE | ✓ Time Limit Exceeded (t=2.484 · m=2652) | ✓ Time Limit Exceeded (t=5.101 · m=1440) | ✓ Time Limit Exceeded (t=5.07 · m=1760) | ✓ Time Limit Exceeded (t=5.04 · m=1664) |
-| Node TLE | ✓ Time Limit Exceeded (t=2.5 · m=7824) | ✓ Time Limit Exceeded (t=5.034 · m=7680) | ✓ Time Limit Exceeded (t=5.074 · m=7772) | ✓ Time Limit Exceeded (t=5.016 · m=8424) |
-| Python ML TLE | ✓ Time Limit Exceeded (t=2.533 · m=5732) | ✓ Time Limit Exceeded (t=5.028 · m=3780) | ✓ Time Limit Exceeded (t=5.072 · m=3620) | ✓ Time Limit Exceeded (t=5.035 · m=3784) |
-| MIPS TLE | ✓ Time Limit Exceeded (t=2.508 · m=37896) | ✓ Time Limit Exceeded (t=5.014 · m=51268) | ✓ Time Limit Exceeded (t=5.077 · m=40700) | ✓ Time Limit Exceeded (t=5.066 · m=51752) |
-| C14 TLE | ✗ ? | ✗ ? | ✗ NO TOKEN | ✗ NO TOKEN |
-| C++14 TLE | ✗ ? | ✗ ? | ✗ NO TOKEN | ✗ NO TOKEN |
+| NASM TLE | ✓ Time Limit Exceeded (t=2.529 · m=3208) | ✓ Time Limit Exceeded (t=5.03 · m=1020) | ✓ Time Limit Exceeded (t=5.079 · m=2528) | ✓ Time Limit Exceeded (t=5.053 · m=1016) |
+| Bash TLE | ✓ Time Limit Exceeded (t=2.523 · m=1988) | ✓ Time Limit Exceeded (t=5.037 · m=1404) | ✓ Time Limit Exceeded (t=5.066 · m=1996) | ✓ Time Limit Exceeded (t=5.018 · m=1212) |
+| FreeBASIC TLE | ✓ Time Limit Exceeded (t=2.511 · m=9124) | ✓ Time Limit Exceeded (t=5.044 · m=1084) | ✓ Time Limit Exceeded (t=5.076 · m=4536) | ✓ Time Limit Exceeded (t=5.047 · m=1144) |
+| C9.5 TLE | ✓ Time Limit Exceeded (t=2.521 · m=6124) | ✓ Time Limit Exceeded (t=5.042 · m=820) | ✓ Time Limit Exceeded (t=5.075 · m=1504) | ✓ Time Limit Exceeded (t=5.022 · m=1016) |
+| C++9.5 TLE | ✓ Time Limit Exceeded (t=2.546 · m=1688) | ✓ Time Limit Exceeded (t=5.031 · m=1564) | ✓ Time Limit Exceeded (t=5.082 · m=1188) | ✓ Time Limit Exceeded (t=5.041 · m=1404) |
+| Go TLE | ✓ Time Limit Exceeded (t=2.538 · m=10176) | ✓ Time Limit Exceeded (t=5.022 · m=2632) | ✓ Time Limit Exceeded (t=5.081 · m=4552) | ✓ Time Limit Exceeded (t=5.054 · m=2944) |
+| Java TLE | ✓ Time Limit Exceeded (t=2.532 · m=10484) | ✓ Time Limit Exceeded (t=5.039 · m=19892) | ✓ Time Limit Exceeded (t=5.067 · m=10480) | ✓ Time Limit Exceeded (t=5.04 · m=19920) |
+| Python TLE | ✓ Time Limit Exceeded (t=2.505 · m=8860) | ✓ Time Limit Exceeded (t=5.004 · m=3472) | ✓ Time Limit Exceeded (t=5.071 · m=3448) | ✓ Time Limit Exceeded (t=5.03 · m=3520) |
+| Ruby TLE | ✓ Time Limit Exceeded (t=2.49 · m=9148) | ✓ Time Limit Exceeded (t=5.016 · m=6472) | ✓ Time Limit Exceeded (t=5.068 · m=9372) | ✓ Time Limit Exceeded (t=5.031 · m=6020) |
+| Rust TLE | ✗ Compilation Error | ✓ Time Limit Exceeded (t=5.022 · m=1220) | ✗ Compilation Error | ✓ Time Limit Exceeded (t=5.037 · m=1216) |
+| TypeScript TLE | ✓ Time Limit Exceeded (t=2.524 · m=9984) | ✓ Time Limit Exceeded (t=5.033 · m=7660) | ✓ Time Limit Exceeded (t=5.078 · m=10056) | ✓ Time Limit Exceeded (t=5.028 · m=7968) |
+| Kotlin TLE | ✓ Time Limit Exceeded (t=2.523 · m=15616) | ✓ Time Limit Exceeded (t=5.091 · m=29076) | ✓ Time Limit Exceeded (t=5.067 · m=14116) | ✓ Time Limit Exceeded (t=5.081 · m=29448) |
+| R TLE | ✓ Time Limit Exceeded (t=2.493 · m=65704) | ✓ Time Limit Exceeded (t=5.049 · m=64552) | ✓ Time Limit Exceeded (t=5.079 · m=64260) | ✓ Time Limit Exceeded (t=5.03 · m=65380) |
+| Scala TLE | ✓ Time Limit Exceeded (t=2.503 · m=44832) | ✓ Time Limit Exceeded (t=5.005 · m=20576) | ✓ Time Limit Exceeded (t=5.084 · m=59348) | ✓ Time Limit Exceeded (t=5.1 · m=20100) |
+| SQL TLE | ✓ Time Limit Exceeded (t=2.504 · m=1820) | ✓ Time Limit Exceeded (t=5.012 · m=1720) | ✓ Time Limit Exceeded (t=5.076 · m=1172) | ✓ Time Limit Exceeded (t=5.048 · m=1528) |
+| Node TLE | ✓ Time Limit Exceeded (t=2.455 · m=8568) | ✓ Time Limit Exceeded (t=5.038 · m=8144) | ✓ Time Limit Exceeded (t=5.07 · m=7764) | ✓ Time Limit Exceeded (t=5.102 · m=7612) |
+| Python ML TLE | ✓ Time Limit Exceeded (t=2.535 · m=3892) | ✓ Time Limit Exceeded (t=5.029 · m=3788) | ✓ Time Limit Exceeded (t=5.066 · m=3144) | ✓ Time Limit Exceeded (t=5.046 · m=3748) |
+| MIPS TLE | ✓ Time Limit Exceeded (t=2.539 · m=35108) | ✓ Time Limit Exceeded (t=5.04 · m=51552) | ✓ Time Limit Exceeded (t=5.074 · m=41676) | ✓ Time Limit Exceeded (t=5.032 · m=51572) |
 
 ## OOM
 
 | Lang | sync prod | sync staging | async prod | async staging |
 |---|---|---|---|---|
-| FreeBASIC OOM | ✓ Runtime Error (NZEC) (t=0.295 · m=65536) | ✓ Runtime Error (NZEC) (t=0.1 · m=65536) | ✓ Runtime Error (NZEC) (t=0.351 · m=65536) | ✓ Runtime Error (NZEC) (t=0.101 · m=65536) |
-| C9.5 OOM | ✓ Runtime Error (NZEC) (t=0.36 · m=65536) | ✓ Runtime Error (NZEC) (t=0.098 · m=65536) | ✓ Runtime Error (NZEC) (t=0.293 · m=65536) | ✓ Runtime Error (NZEC) (t=0.096 · m=65536) |
-| C++9.5 OOM | ✓ Runtime Error (NZEC) (t=0.311 · m=65536) | ✓ Runtime Error (NZEC) (t=0.101 · m=65536) | ✓ Runtime Error (NZEC) (t=0.369 · m=65536) | ✓ Runtime Error (NZEC) (t=0.101 · m=65536) |
-| Go OOM | ✓ Runtime Error (NZEC) (t=0.423 · m=65536) | ✓ Runtime Error (NZEC) (t=0.116 · m=65536) | ✓ Runtime Error (NZEC) (t=0.386 · m=65536) | ✓ Runtime Error (NZEC) (t=0.109 · m=65536) |
-| Java OOM | ✓ Runtime Error (NZEC) (t=0.375 · m=65536) | ✓ Runtime Error (NZEC) (t=0.131 · m=65536) | ✓ Runtime Error (NZEC) (t=0.438 · m=65536) | ✓ Runtime Error (NZEC) (t=0.129 · m=65536) |
-| Python OOM | ✓ Runtime Error (NZEC) (t=0.369 · m=65536) | ✓ Runtime Error (NZEC) (t=0.111 · m=65536) | ✓ Runtime Error (NZEC) (t=0.31 · m=65536) | ✓ Runtime Error (NZEC) (t=0.106 · m=65536) |
-| Ruby OOM | ✓ Runtime Error (NZEC) (t=0.346 · m=65536) | ✓ Runtime Error (NZEC) (t=0.158 · m=65536) | ✓ Runtime Error (NZEC) (t=0.405 · m=65536) | ✓ Runtime Error (NZEC) (t=0.158 · m=65536) |
-| Rust OOM | ✓ Runtime Error (NZEC) (t=0.382 · m=65536) | ✓ Runtime Error (NZEC) (t=0.104 · m=65536) | ✓ Runtime Error (NZEC) (t=0.364 · m=65536) | ✓ Runtime Error (NZEC) (t=0.102 · m=65536) |
-| TypeScript OOM | ✓ Runtime Error (NZEC) (t=0.322 · m=65536) | ✓ Runtime Error (NZEC) (t=0.121 · m=65536) | ✓ Runtime Error (NZEC) (t=0.393 · m=65536) | ✓ Runtime Error (NZEC) (t=0.123 · m=65536) |
-| R OOM | ✓ Runtime Error (NZEC) (t=0.464 · m=65536) | ✓ Runtime Error (NZEC) (t=0.275 · m=65536) | ✓ Runtime Error (NZEC) (t=0.475 · m=65536) | ✓ Runtime Error (NZEC) (t=0.273 · m=65536) |
-| Node OOM | ✓ Runtime Error (NZEC) (t=0.39 · m=65536) | ✓ Runtime Error (NZEC) (t=0.12 · m=65536) | ✓ Runtime Error (NZEC) (t=0.38 · m=65536) | ✓ Runtime Error (NZEC) (t=0.121 · m=65536) |
-| Python ML OOM | ✓ Runtime Error (NZEC) (t=0.319 · m=65536) | ✓ Runtime Error (NZEC) (t=0.108 · m=65536) | ✓ Runtime Error (NZEC) (t=0.315 · m=65536) | ✓ Runtime Error (NZEC) (t=0.107 · m=65536) |
-| C14 OOM | ✗ ? | ✗ ? | ✗ NO TOKEN | ✗ NO TOKEN |
-| C++14 OOM | ✗ ? | ✗ ? | ✗ NO TOKEN | ✗ NO TOKEN |
+| FreeBASIC OOM | ✓ Runtime Error (NZEC) (t=0.377 · m=65536) | ✓ Runtime Error (NZEC) (t=0.099 · m=65536) | ✓ Runtime Error (NZEC) (t=0.35 · m=65536) | ✓ Runtime Error (NZEC) (t=0.101 · m=65536) |
+| C9.5 OOM | ✓ Runtime Error (NZEC) (t=0.293 · m=65536) | ✓ Runtime Error (NZEC) (t=0.098 · m=65536) | ✓ Runtime Error (NZEC) (t=0.305 · m=65536) | ✓ Runtime Error (NZEC) (t=0.102 · m=65536) |
+| C++9.5 OOM | ✓ Runtime Error (NZEC) (t=0.362 · m=65536) | ✓ Runtime Error (NZEC) (t=0.098 · m=65536) | ✓ Runtime Error (NZEC) (t=0.365 · m=65536) | ✓ Runtime Error (NZEC) (t=0.098 · m=65536) |
+| Go OOM | ✓ Runtime Error (NZEC) (t=0.385 · m=65536) | ✓ Runtime Error (NZEC) (t=0.116 · m=65536) | ✓ Runtime Error (NZEC) (t=0.664 · m=65536) | ✓ Runtime Error (NZEC) (t=0.12 · m=65536) |
+| Java OOM | ✓ Runtime Error (NZEC) (t=0.439 · m=65536) | ✓ Runtime Error (NZEC) (t=0.131 · m=65536) | ✓ Runtime Error (NZEC) (t=0.363 · m=65536) | ✓ Runtime Error (NZEC) (t=0.125 · m=65536) |
+| Python OOM | ✓ Runtime Error (NZEC) (t=0.327 · m=65536) | ✓ Runtime Error (NZEC) (t=0.109 · m=65536) | ✓ Runtime Error (NZEC) (t=0.368 · m=65536) | ✓ Runtime Error (NZEC) (t=0.104 · m=65536) |
+| Ruby OOM | ✓ Runtime Error (NZEC) (t=0.413 · m=65536) | ✓ Runtime Error (NZEC) (t=0.16 · m=65536) | ✓ Runtime Error (NZEC) (t=0.357 · m=65536) | ✓ Runtime Error (NZEC) (t=0.161 · m=65536) |
+| Rust OOM | ✓ Runtime Error (NZEC) (t=0.338 · m=65536) | ✓ Runtime Error (NZEC) (t=0.123 · m=65536) | ✓ Runtime Error (NZEC) (t=0.393 · m=65536) | ✓ Runtime Error (NZEC) (t=0.103 · m=65536) |
+| TypeScript OOM | ✓ Runtime Error (NZEC) (t=0.385 · m=65536) | ✓ Runtime Error (NZEC) (t=0.119 · m=65536) | ✓ Runtime Error (NZEC) (t=0.338 · m=65536) | ✓ Runtime Error (NZEC) (t=0.12 · m=65536) |
+| Kotlin OOM | ✓ Runtime Error (NZEC) (t=0.439 · m=65536) | ✓ Runtime Error (NZEC) (t=0.277 · m=65536) | ✓ Runtime Error (NZEC) (t=0.491 · m=65536) | ✓ Runtime Error (NZEC) (t=0.276 · m=65536) |
+| R OOM | ✓ Runtime Error (NZEC) (t=0.53 · m=65536) | ✓ Runtime Error (NZEC) (t=0.272 · m=65536) | ✓ Runtime Error (NZEC) (t=0.492 · m=65536) | ✓ Runtime Error (NZEC) (t=0.268 · m=65536) |
+| Scala OOM | ✓ Runtime Error (NZEC) (t=1.062 · m=65536) | ✓ Runtime Error (NZEC) (t=0.133 · m=65536) | ✓ Runtime Error (NZEC) (t=1.209 · m=65536) | ✓ Runtime Error (NZEC) (t=0.13 · m=65536) |
+| Node OOM | ✓ Runtime Error (NZEC) (t=0.388 · m=65536) | ✓ Runtime Error (NZEC) (t=0.118 · m=65536) | ✓ Runtime Error (NZEC) (t=0.338 · m=65536) | ✓ Runtime Error (NZEC) (t=0.119 · m=65536) |
+| Python ML OOM | ✓ Runtime Error (NZEC) (t=0.322 · m=65536) | ✓ Runtime Error (NZEC) (t=0.107 · m=65536) | ✓ Runtime Error (NZEC) (t=0.37 · m=65536) | ✓ Runtime Error (NZEC) (t=0.107 · m=65536) |
 
 ## Tally
 
-- **Prod**:    86/100 PASS
-- **Staging**: 88/100 PASS *(was 100/100 in 0.62 — see notes)*
+- **Prod**:    100/102 PASS
+- **Staging**: 102/102 PASS
 
 ## Failure breakdown
 
 ### Prod failures
 
-- `[sync]` **C GCC14 3003** — got `?`
-- `[sync]` **C++ GCC14 3004** — got `?`
 - `[sync]` **Rust TLE** — got `Compilation Error`
-- `[sync]` **C14 TLE** — got `?`
-- `[sync]` **C++14 TLE** — got `?`
-- `[sync]` **C14 OOM** — got `?`
-- `[sync]` **C++14 OOM** — got `?`
-- `[async]` **C GCC14 3003** — got `NO TOKEN`
-- `[async]` **C++ GCC14 3004** — got `NO TOKEN`
 - `[async]` **Rust TLE** — got `Compilation Error`
-- `[async]` **C14 TLE** — got `NO TOKEN`
-- `[async]` **C++14 TLE** — got `NO TOKEN`
-- `[async]` **C14 OOM** — got `NO TOKEN`
-- `[async]` **C++14 OOM** — got `NO TOKEN`
 
 ### Staging failures
 
-- `[sync]` **C GCC14 3003** — got `?`
-- `[sync]` **C++ GCC14 3004** — got `?`
-- `[sync]` **C14 TLE** — got `?`
-- `[sync]` **C++14 TLE** — got `?`
-- `[sync]` **C14 OOM** — got `?`
-- `[sync]` **C++14 OOM** — got `?`
-- `[async]` **C GCC14 3003** — got `NO TOKEN`
-- `[async]` **C++ GCC14 3004** — got `NO TOKEN`
-- `[async]` **C14 TLE** — got `NO TOKEN`
-- `[async]` **C++14 TLE** — got `NO TOKEN`
-- `[async]` **C14 OOM** — got `NO TOKEN`
-- `[async]` **C++14 OOM** — got `NO TOKEN`
+_(none)_
 
 ## Notes
 
-**Why staging dropped from 100/100 to 88/100**: not a regression — `bin/newton-bounds-test` still includes probes for C / C++ GCC 14 (ids 3003 / 3004), which were intentionally archived in 0.64. Both environments now reject those submissions: prod with `NO TOKEN` (the ids never existed in `master`'s active.rb), staging with the same shape because `Language.default_scope` filters archived ids out before the controller validates the request. The 12 cells (2 langs × 3 probes × 2 modes) are the entire 100 → 88 delta. The other ∂ on prod (Rust TLE compilation error) is identical to the 0.62 run — same root cause (older Rust pre-`std::hint::black_box`).
+**Plain Text / Kotlin / Scala on prod**: surprise — all three pass on prod too. They were never trimmed from `master`'s `active.rb`; the 0.59 trim happened on the `modernise` branch only, and prod never picked it up. So the language IDs (43, 78, 81) have always been live on prod with their pre-modernise paths (`kotlin-2.1.0`, `scala-3.6.2` etc.), which is why the bounds probes resolve. The staging deploy gets the bumped versions (Kotlin 2.3.21, Scala 3.8.3) plus the JVM heap caps for kotlinc; functionally equivalent for hello-world but on a current toolchain.
 
-**To restore a fully-green staging tally**, drop the GCC 14 probes from `bin/newton-bounds-test` (ids `3003`, `3004` references on lines ~241/261/272-ish). The probes still cover GCC 9.5 (50 / 54), which is the only C/C++ toolchain in 0.28+. Tracked but not done in this PR — bounds-test refactor is a separate piece of work.
+**Why prod still fails Rust TLE**: the test source uses `std::hint::black_box`, stabilized in **Rust 1.66** (Dec 2022). Prod's pre-modernise Rust is older than 1.66, so the import fails to compile. Staging's Rust 1.83.0 (in `compilers:0.28`) compiles it cleanly. This is a Rust-version difference, not a regression — the modernise upgrade is what makes the TLE source work.
 
-**Plain Text (43), Kotlin (78), Scala 3 (81) bounds coverage**: not yet added to `bin/newton-bounds-test`. Plain Text has no meaningful TLE/OOM probes (it's just `cat`); Kotlin and Scala both compile JVM bytecode and could run the same TLE/OOM patterns as Java. Adding them is straightforward but deferred from this PR. Smoke-test coverage exists today via `bin/newton-smoke-test` (HELLO only): all three pass on staging.
+**Kotlin compile fitting in the 500 MB cgroup (0.65 hotfix)**: `app/jobs/isolate_job.rb` hardcodes the compile step's `--cg-mem` to `Config::MAX_MEMORY_LIMIT` regardless of per-submission `memory_limit`. Staging's `MAX_MEMORY_LIMIT=512000 KB` (500 MB) was insufficient for Kotlin 2.3.21's compiler with default G1GC + uncapped metaspace + default code-cache reservation — the JVM's native footprint blew past 500 MB and the cgroup OOM-killer SIGKILL'd the java subprocess on every Kotlin submission. Fix is `-J-Xmx384m -J-XX:MaxMetaspaceSize=80m -J-XX:ReservedCodeCacheSize=32m -J-XX:+UseSerialGC` baked into the language's compile_cmd; `UseSerialGC` is load-bearing (G1's native bookkeeping was the difference between a ~480 MB and ~600 MB resident footprint). Documented in CLAUDE.md per-language tuning conventions. Prod runs Kotlin 2.1.0 which doesn't need this — older compiler footprint is smaller.
 
-**Kotlin compile fitting in the 500 MB cgroup (0.65 hotfix)**: `app/jobs/isolate_job.rb` hardcodes the compile step's `--cg-mem` to `Config::MAX_MEMORY_LIMIT` regardless of per-submission `memory_limit`. Staging's `MAX_MEMORY_LIMIT=512000 KB` (500 MB) was insufficient for kotlinc with default G1GC + uncapped metaspace + default code-cache reservation — the JVM's native footprint blew past 500 MB and the cgroup OOM-killer SIGKILL'd the java subprocess on every Kotlin submission. Fix is `-J-Xmx384m -J-XX:MaxMetaspaceSize=80m -J-XX:ReservedCodeCacheSize=32m -J-XX:+UseSerialGC` baked into the language's compile_cmd; `UseSerialGC` is load-bearing (G1's native bookkeeping was the difference between a ~480 MB and ~600 MB resident footprint). Documented in CLAUDE.md per-language tuning conventions.
+**Why Scala compile is `t=0.7-0.8s` on prod but `t=0.25s` on staging**: prod's Scala 3.6.2 cold-start is heavier (the older release loads more upfront) and, more importantly, prod's CPU accounting is rlimit-mode `RUSAGE_SELF` which is wall-clockish for the compile; staging's cgroup `cpu.stat` only counts the compile-step subprocess. Staging's `t=0.25s` looks faster but is measuring a smaller window.
 
 **Why staging needed `MAX_MAX_FILE_SIZE` bumped to enable Go**: `app/jobs/isolate_job.rb` uses `Config::MAX_MAX_FILE_SIZE` (the global cap) for the **compile** step's `-f` flag, not the per-submission `max_file_size`. Default `MAX_MAX_FILE_SIZE` is 4096 KB (4 MB) — fine for Go 1.13.5 on prod (binaries ≈ 1.5–2 MB) but too small for Go 1.23.4 on staging (compile intermediates exceed ~12 MB; minimum measured threshold for `go build hello.go` is between 12 000 KB and 13 000 KB). Setting `MAX_MAX_FILE_SIZE=1048576` (1 GiB) on staging lifted that cap and Go now compiles cleanly.
 
 **Go 1.13.5 (prod) vs Go 1.23.4 (staging)** — why the size difference: 5 years of stdlib growth. Go 1.13's `runtime` package is much smaller; generics (1.18+) and the rewritten regex/PGO/coverage instrumentation in 1.20–1.22 each added megabytes to the linked artifacts. Hello-world final binary went from ~1.6 MB (1.13) to ~2.5 MB (1.23) and intermediate `_pkg_.a` archives in `$WORK/b00x/` are larger still because they include the entire transitive import compilation, not just main.
 
-**Why prod fails Rust TLE**: the test source uses `std::hint::black_box`, stabilized in **Rust 1.66** (Dec 2022). Prod's pre-modernise Rust toolchain is older than 1.66, so the import fails to compile. Staging's Rust 1.83.0 (in `compilers:0.28`) compiles it cleanly. This is a Rust-version difference, not a regression — the modernise upgrade is what makes the TLE source work.
-
 **Memory readout differences**: prod uses rlimit-mode `max-rss` (per-process resident set size); staging uses cgroup `memory.peak` (cgroup-wide peak). For single-process programs the two are close. After the 0.62 cgroup-reset between compile and run, run-time `memory.peak` reflects only the run phase.
 
 **TLE timing**: prod's sync TLE fires at ~2.5s of CPU time; staging's at ~5.0s. The difference is cgroup-v2 cpu.stat sampling lag — under `--cg-timing`, isolate samples `cpu.stat` periodically rather than receiving an immediate signal, so a few hundred milliseconds of CPU can accumulate past `cpu_time_limit + cpu_extra_time` before SIGKILL fires. Both still kill before `wall_time_limit=5`. Acceptable but more lenient on staging by ~2.5×.
 
-**OOM speed**: staging is 3× faster than prod (avg 0.13s vs 0.37s) — cgroup `memory.max` triggers OOM kill the moment RSS crosses the cap; prod's `RLIMIT_AS` lets the process malloc past the cap and crash on page fault. Both end with `mem=65536` exactly on staging (cgroup cap), prod sometimes overshoots before crash.
+**OOM speed**: staging is 3-4× faster than prod for most languages — cgroup `memory.max` triggers OOM kill the moment RSS crosses the cap; prod's `RLIMIT_AS` lets the process malloc past the cap and crash on page fault. Both end with `mem=65536` exactly on staging (cgroup cap). Kotlin / Scala / R OOM probes are slower on both because the JVM/runtime startup itself fills enough heap to OOM before the explicit alloc finishes; the `t=0.27-1.2s` figures reflect runtime startup, not the alloc loop.

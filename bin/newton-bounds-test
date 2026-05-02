@@ -16,10 +16,15 @@
 #   - 3000 HDL  / 3002 Jack — deterministic simulators driven by stdin harnesses;
 #                              no general-purpose looping or alloc primitives.
 # Partially covered:
+#   - 43 Plain Text — HELLO only (cat-based; can't busy-loop or alloc).
 #   - 45 NASM   — HELLO + TLE  (raw-asm OOM via brk/mmap is impractical here)
 #   - 46 Bash   — HELLO + TLE  (bash mass-alloc is awkward)
 #   - 82 SQL    — HELLO + TLE  (SQLite mass-alloc not single-statement-friendly)
 #   - 3001 MIPS — HELLO + TLE  (Mars heap syscalls heavy)
+#
+# 0.64 / 0.28-base changes:
+#   - GCC 14 ids 3003 / 3004 dropped from probes (archived in active.rb).
+#   - Kotlin 78 + Scala 81 + Plain Text 43 added.
 #
 # Known regression: id 60 Go fails HELLO under cgroup mode due to cpu.stat
 # over-accounting Go runtime startup. Tracked separately; included here on
@@ -141,6 +146,30 @@ JAVA_HELLO='public class Main { public static void main(String[] a) { System.out
 JAVA_TLE='public class Main { public static void main(String[] a) { while(true){} } }'
 JAVA_OOM='public class Main { public static void main(String[] a) { byte[] x = new byte[200*1024*1024]; for (int i = 0; i < x.length; i += 4096) x[i] = 1; System.out.println(x.length); } }'
 
+KOTLIN_HELLO='fun main() { println("Hello, Newton!") }'
+KOTLIN_TLE='fun main() { while (true) {} }'
+KOTLIN_OOM='fun main() {
+    val x = ByteArray(200 * 1024 * 1024)
+    var i = 0
+    while (i < x.size) { x[i] = 1; i += 4096 }
+    println(x.size)
+}'
+
+SCALA_HELLO='object Main { def main(args: Array[String]): Unit = println("Hello, Newton!") }'
+SCALA_TLE='object Main { def main(args: Array[String]): Unit = { while (true) {} } }'
+SCALA_OOM='object Main {
+  def main(args: Array[String]): Unit = {
+    val x = new Array[Byte](200 * 1024 * 1024)
+    var i = 0
+    while (i < x.length) { x(i) = 1; i += 4096 }
+    println(x.length)
+  }
+}'
+
+# Plain Text submissions are dumped verbatim by /bin/cat — no TLE/OOM
+# semantics possible; HELLO probe only.
+TEXT_HELLO='Hello, Newton!'
+
 PY_HELLO='print("Hello, Newton!")'
 PY_TLE='while True: pass'
 PY_OOM='x = bytearray(200 * 1024 * 1024)
@@ -222,6 +251,7 @@ for mode in sync async; do
   echo "═══ Mode: ${mode} ═══"
 
   echo "── Hello world (default limits) ──"
+  run "Plain Text 43"    "$mode" 'Accepted' 43   "$TEXT_HELLO"
   run "NASM 45"          "$mode" 'Accepted' 45   "$NASM_HELLO"
   run "Bash 46"          "$mode" 'Accepted' 46   "$BASH_HELLO"
   run "FreeBASIC 47"     "$mode" 'Accepted' 47   "$FBASIC_HELLO"
@@ -233,49 +263,49 @@ for mode in sync async; do
   run "Ruby 72"          "$mode" 'Accepted' 72   "$RUBY_HELLO"
   run "Rust 73"          "$mode" 'Accepted' 73   "$RUST_HELLO"
   run "TypeScript 74"    "$mode" 'Accepted' 74   "$TS_HELLO"
+  run "Kotlin 78"        "$mode" 'Accepted' 78   "$KOTLIN_HELLO"
   run "R 80"             "$mode" 'Accepted' 80   "$R_HELLO"
+  run "Scala 81"         "$mode" 'Accepted' 81   "$SCALA_HELLO"
   run "SQL 82"           "$mode" 'Accepted' 82   "$SQL_HELLO"
   run "Node.js 1999"     "$mode" 'Accepted' 1999 "$NODE_HELLO"
   run "Python ML 2000"   "$mode" 'Accepted' 2000 "$PY_HELLO"
   run "MIPS 3001"        "$mode" 'Accepted' 3001 "$MIPS_HELLO"
-  run "C GCC14 3003"     "$mode" 'Accepted' 3003 "$C_HELLO"
-  run "C++ GCC14 3004"   "$mode" 'Accepted' 3004 "$CPP_HELLO"
 
   echo "── TLE: cpu_time_limit=1, busy loop ──"
-  run "NASM TLE"         "$mode" 'Time Limit'  45   "$NASM_TLE"   "$TLE_OPTS"
-  run "Bash TLE"         "$mode" 'Time Limit'  46   "$BASH_TLE"   "$TLE_OPTS"
-  run "FreeBASIC TLE"    "$mode" 'Time Limit'  47   "$FBASIC_TLE" "$TLE_OPTS"
-  run "C9.5 TLE"         "$mode" 'Time Limit'  50   "$C_TLE"      "$TLE_OPTS"
-  run "C++9.5 TLE"       "$mode" 'Time Limit'  54   "$CPP_TLE"    "$TLE_OPTS"
-  run "Go TLE"           "$mode" 'Time Limit'  60   "$GO_TLE"     "$TLE_OPTS"
-  run "Java TLE"         "$mode" 'Time Limit'  62   "$JAVA_TLE"   "$TLE_OPTS"
-  run "Python TLE"       "$mode" 'Time Limit'  71   "$PY_TLE"     "$TLE_OPTS"
-  run "Ruby TLE"         "$mode" 'Time Limit'  72   "$RUBY_TLE"   "$TLE_OPTS"
-  run "Rust TLE"         "$mode" 'Time Limit'  73   "$RUST_TLE"   "$TLE_OPTS"
-  run "TypeScript TLE"   "$mode" 'Time Limit'  74   "$TS_TLE"     "$TLE_OPTS"
-  run "R TLE"            "$mode" 'Time Limit'  80   "$R_TLE"      "$TLE_OPTS"
-  run "SQL TLE"          "$mode" 'Time Limit'  82   "$SQL_TLE"    "$TLE_OPTS"
-  run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE"   "$TLE_OPTS"
-  run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"     "$TLE_OPTS"
-  run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"   "$TLE_OPTS"
-  run "C14 TLE"          "$mode" 'Time Limit'  3003 "$C_TLE"      "$TLE_OPTS"
-  run "C++14 TLE"        "$mode" 'Time Limit'  3004 "$CPP_TLE"    "$TLE_OPTS"
+  run "NASM TLE"         "$mode" 'Time Limit'  45   "$NASM_TLE"    "$TLE_OPTS"
+  run "Bash TLE"         "$mode" 'Time Limit'  46   "$BASH_TLE"    "$TLE_OPTS"
+  run "FreeBASIC TLE"    "$mode" 'Time Limit'  47   "$FBASIC_TLE"  "$TLE_OPTS"
+  run "C9.5 TLE"         "$mode" 'Time Limit'  50   "$C_TLE"       "$TLE_OPTS"
+  run "C++9.5 TLE"       "$mode" 'Time Limit'  54   "$CPP_TLE"     "$TLE_OPTS"
+  run "Go TLE"           "$mode" 'Time Limit'  60   "$GO_TLE"      "$TLE_OPTS"
+  run "Java TLE"         "$mode" 'Time Limit'  62   "$JAVA_TLE"    "$TLE_OPTS"
+  run "Python TLE"       "$mode" 'Time Limit'  71   "$PY_TLE"      "$TLE_OPTS"
+  run "Ruby TLE"         "$mode" 'Time Limit'  72   "$RUBY_TLE"    "$TLE_OPTS"
+  run "Rust TLE"         "$mode" 'Time Limit'  73   "$RUST_TLE"    "$TLE_OPTS"
+  run "TypeScript TLE"   "$mode" 'Time Limit'  74   "$TS_TLE"      "$TLE_OPTS"
+  run "Kotlin TLE"       "$mode" 'Time Limit'  78   "$KOTLIN_TLE"  "$TLE_OPTS"
+  run "R TLE"            "$mode" 'Time Limit'  80   "$R_TLE"       "$TLE_OPTS"
+  run "Scala TLE"        "$mode" 'Time Limit'  81   "$SCALA_TLE"   "$TLE_OPTS"
+  run "SQL TLE"          "$mode" 'Time Limit'  82   "$SQL_TLE"     "$TLE_OPTS"
+  run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE"    "$TLE_OPTS"
+  run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"      "$TLE_OPTS"
+  run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"    "$TLE_OPTS"
 
   echo "── OOM: memory_limit=65536 (64 MB), alloc 200 MB ──"
-  run "FreeBASIC OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 47   "$FBASIC_OOM" "$OOM_OPTS"
-  run "C9.5 OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 50   "$C_OOM"      "$OOM_OPTS"
-  run "C++9.5 OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 54   "$CPP_OOM"    "$OOM_OPTS"
-  run "Go OOM"           "$mode" 'Runtime Error|Memory Limit|Killed' 60   "$GO_OOM"     "$OOM_OPTS"
-  run "Java OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 62   "$JAVA_OOM"   "$OOM_OPTS"
-  run "Python OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 71   "$PY_OOM"     "$OOM_OPTS"
-  run "Ruby OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 72   "$RUBY_OOM"   "$OOM_OPTS"
-  run "Rust OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 73   "$RUST_OOM"   "$OOM_OPTS"
-  run "TypeScript OOM"   "$mode" 'Runtime Error|Memory Limit|Killed' 74   "$TS_OOM"     "$OOM_OPTS"
-  run "R OOM"            "$mode" 'Runtime Error|Memory Limit|Killed' 80   "$R_OOM"      "$OOM_OPTS"
-  run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"   "$OOM_OPTS"
-  run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"     "$OOM_OPTS"
-  run "C14 OOM"          "$mode" 'Runtime Error|Memory Limit|Killed' 3003 "$C_OOM"      "$OOM_OPTS"
-  run "C++14 OOM"        "$mode" 'Runtime Error|Memory Limit|Killed' 3004 "$CPP_OOM"    "$OOM_OPTS"
+  run "FreeBASIC OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 47   "$FBASIC_OOM"  "$OOM_OPTS"
+  run "C9.5 OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 50   "$C_OOM"       "$OOM_OPTS"
+  run "C++9.5 OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 54   "$CPP_OOM"     "$OOM_OPTS"
+  run "Go OOM"           "$mode" 'Runtime Error|Memory Limit|Killed' 60   "$GO_OOM"      "$OOM_OPTS"
+  run "Java OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 62   "$JAVA_OOM"    "$OOM_OPTS"
+  run "Python OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 71   "$PY_OOM"      "$OOM_OPTS"
+  run "Ruby OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 72   "$RUBY_OOM"    "$OOM_OPTS"
+  run "Rust OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 73   "$RUST_OOM"    "$OOM_OPTS"
+  run "TypeScript OOM"   "$mode" 'Runtime Error|Memory Limit|Killed' 74   "$TS_OOM"      "$OOM_OPTS"
+  run "Kotlin OOM"       "$mode" 'Runtime Error|Memory Limit|Killed' 78   "$KOTLIN_OOM"  "$OOM_OPTS"
+  run "R OOM"            "$mode" 'Runtime Error|Memory Limit|Killed' 80   "$R_OOM"       "$OOM_OPTS"
+  run "Scala OOM"        "$mode" 'Runtime Error|Memory Limit|Killed' 81   "$SCALA_OOM"   "$OOM_OPTS"
+  run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"    "$OOM_OPTS"
+  run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"      "$OOM_OPTS"
 
   echo
 done
