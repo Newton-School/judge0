@@ -104,12 +104,13 @@ language ids exist and what they invoke. Editing it requires a
   model: `source_code` is the student's DUT, `stdin` is the
   instructor-supplied testbench. `compile_cmd` parse-checks the DUT
   alone with `iverilog -tnull` (so DUT syntax errors go to the Compile
-  Error bucket); `run_cmd` does `cat > tb.v && iverilog ... && vvp ... |
-  grep -v 'finish called at '`. The grep filter strips vvp's
-  `tb.v:N: $finish called at T (1s)` epilogue from stdout — it's
-  volatile across runs and would otherwise have to be matched in every
-  problem's `expected_output`. Full design rationale and author
-  conventions in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
+  Error bucket); `run_cmd` does `cat > tb.v && iverilog ... && vvp ...`
+  and forwards vvp's stdout verbatim — no filtering. Problem authors
+  must capture `expected_output` by running their testbench and
+  including everything vvp prints, including the
+  `tb.v:N: $finish called at T (1s)` epilogue (or use `$finish(0);` in
+  the testbench to suppress that line at source). Full design rationale
+  in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
 
 ## Build commands
 

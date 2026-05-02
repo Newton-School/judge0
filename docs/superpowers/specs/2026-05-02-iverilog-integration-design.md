@@ -129,7 +129,7 @@ Append to `db/languages/active.rb`:
   is_archived: false,
   source_file: "main.v",
   compile_cmd: "/usr/local/iverilog-13.0/bin/iverilog -g2012 -tnull %s main.v",
-  run_cmd: "/bin/cat > tb.v && /usr/local/iverilog-13.0/bin/iverilog -g2012 -o sim.vvp main.v tb.v && /usr/local/iverilog-13.0/bin/vvp sim.vvp | grep -v 'finish called at '"
+  run_cmd: "/bin/cat > tb.v && /usr/local/iverilog-13.0/bin/iverilog -g2012 -o sim.vvp main.v tb.v && /usr/local/iverilog-13.0/bin/vvp sim.vvp"
 }
 ```
 
@@ -151,15 +151,19 @@ Append to `db/languages/active.rb`:
   flag: iverilog auto-detects the top-level module (any module not instantiated
   by another). Problem authors are free to name their testbench module anything
   (`tb_adder`, `tb_d_flipflop_simple`, etc.).
-- `vvp sim.vvp | grep -v 'finish called at '` — runs the simulation and
-  filters out the `tb.v:N: $finish called at T (1s)` epilogue that vvp writes
-  to stdout. Without this filter every problem's `expected_output` would have
-  to include this volatile line (file:line + sim time both vary), which would
-  break grading. Pattern uses `'finish called at '` rather than `'\$finish'`
-  to avoid double-escape gymnastics across the Ruby-string → bash-c boundary
-  in IsolateJob — `$` doesn't need escaping if it's not in the pattern. The
-  string `finish called at ` is unambiguous (a `$display` containing those
-  exact words is implausible in a grading testbench).
+- `vvp sim.vvp` — runs the simulation. **vvp's stdout is forwarded
+  verbatim**, including any `tb.v:N: $finish called at T (1s)` epilogue
+  emitted when the testbench calls `$finish;` with default verbosity.
+  Problem authors are responsible for capturing `expected_output` by
+  running their testbench end-to-end and including whatever vvp prints.
+  To suppress the volatile epilogue at source, the testbench can use
+  `$finish(0);` (verbosity 0 = silent exit). An earlier draft of this
+  spec proposed `| grep -v 'finish called at '` to strip the epilogue
+  in `run_cmd`; that was dropped in favour of "show everything the
+  simulator prints" — it makes problem-author intent explicit (they
+  see exactly what students will see) at the cost of authors having to
+  pick `$finish` vs `$finish(0);` deliberately. See author conventions
+  below.
 
 ## Smoke test addition (judge0 repo)
 
@@ -200,12 +204,21 @@ To be documented in the problem-authoring guide:
    hand-trace `$monitor`. `$monitor` consolidates same-time-step changes into a
    single row (IEEE 1364-2005 §17.1), so hand-traced "before/after posedge"
    row pairs will not appear. To split before/after rows, use explicit
-   `$display` calls with delays.
-2. **Testbench should not use `$dumpfile`/`$dumpvars`** — VCD dumps print a
-   `VCD info: ...` line to stdout that would have to be matched in
-   `expected_output`. (Filtering this line out as well is a possible future
-   addition; for now, document the constraint.)
-3. **Submission should contain the DUT module(s) only** — no extra unconnected
+   `$display` calls with delays. The captured stdout becomes the
+   problem's `expected_output` byte-for-byte — vvp's output is not
+   filtered.
+2. **Pick `$finish` vs `$finish(0);` deliberately** — `$finish;` (default
+   verbosity 1) emits a `tb.v:N: $finish called at T (1s)` line to
+   stdout when simulation ends. The line is volatile (file/line/sim-time
+   change with any unrelated edit), so trivial testbench refactors will
+   break grading if `expected_output` includes it. `$finish(0);` exits
+   silently and avoids the issue. Recommended default: `$finish(0);`.
+3. **Testbench should not use `$dumpfile`/`$dumpvars`** unless the
+   `expected_output` also includes the `VCD info: dumpfile <file> opened
+   for output.` line vvp prints. Until Phase 3 (waveform delivery)
+   ships, VCD output is essentially debug noise that pollutes graded
+   stdout. Skip it.
+4. **Submission should contain the DUT module(s) only** — no extra unconnected
    top-level modules in `main.v`. iverilog's auto-detection runs every
    unconnected module as a top-level in parallel, which would interleave
    output with the testbench.
@@ -274,11 +287,15 @@ prerequisite.
 
 ## Risks and open items
 
-- **`grep -v` exit code:** if vvp produces *only* the `$finish` line (e.g., a
-  testbench that does nothing but `$finish`), `grep -v` exits 1 because no
-  lines remain. judge0 may interpret that as a failure. Verify in dev; if it
-  bites, switch the filter to `sed '/: \$finish called at /d'` (always exits 0
-  on stream end).
+- **`$finish` line in graded stdout:** with no filter in `run_cmd`, every
+  testbench using bare `$finish;` (default verbosity) will emit
+  `tb.v:N: $finish called at T (1s)` to stdout. File/line/sim-time are
+  all volatile across edits, so problems whose `expected_output`
+  bakes in this line will break on trivial testbench refactors.
+  Mitigation is the author convention "use `$finish(0);`" — but it's
+  unenforceable. If author drift becomes a real problem, revisit the
+  filter decision (or, more robustly, an `IsolateJob`-side post-processor
+  that tags volatile lines so the grader can treat them as wildcards).
 - **Multi-module student submissions:** iverilog accepts multiple modules in
   one `.v` file. If a student writes a helper module + a DUT, both compile;
   the testbench instantiates the DUT and helpers come along for the ride.
