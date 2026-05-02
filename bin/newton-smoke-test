@@ -234,6 +234,26 @@ vmstep;
 output-list RAM[0]%D1.6.1 RAM[300]%D1.6.1;
 output;'
 
+# Verilog (Icarus 13.0): source = DUT module, stdin = testbench module.
+# compile_cmd parse-checks the DUT alone (-tnull); run_cmd does
+# `cat > tb.v && iverilog main.v tb.v && vvp` so the testbench from
+# stdin lands in the box only at run time. The grep filter strips
+# vvp's `tb.v:N: $finish called at T (1s)` epilogue from stdout.
+SRC_VERILOG='module inv(input a, output b);
+  assign b = ~a;
+endmodule'
+
+STDIN_VERILOG='module testbench;
+  reg a;
+  wire b;
+  inv dut(a, b);
+  initial begin
+    a = 0;
+    #1 $display("Hello, Newton!");
+    $finish(0);
+  end
+endmodule'
+
 # ────────────────────────────────────────────────────────────────────────
 # 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
 # dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
@@ -314,6 +334,11 @@ t_stdin "HDL Nand2Tetris (3000)"  3000 "$SRC_HDL" "$STDIN_HDL" "|   1   |   0   
 # Jack: source compiles to Main.vm, then a VM-emulator script in stdin
 # steps the function call and dumps RAM cells to stdout.
 t_stdin "Jack (3002)"           3002 "$SRC_JACK" "$STDIN_JACK" "|    401 |     11 |"
+
+# Verilog: source is the DUT, stdin is the testbench. iverilog parse-checks
+# the DUT in compile_cmd; run_cmd does `cat > tb.v` then full-elaborates
+# both files and runs vvp. Testbench prints "Hello, Newton!" via $display.
+t_stdin "Verilog Icarus 13.0 (3005)" 3005 "$SRC_VERILOG" "$STDIN_VERILOG" "$EXPECTED"
 
 # Archived languages are intentionally not tested here — the smoke test
 # verifies the *currently active* surface. See db/languages/archived.rb
