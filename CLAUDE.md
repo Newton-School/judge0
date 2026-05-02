@@ -160,8 +160,9 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world for every active language id. Expected (post-0.66
-with Verilog added): **22 PASS / 0 FAIL / 0 SKIP** on amd64; **20 PASS / 0
-FAIL / 2 SKIP** on arm64 (NASM and FreeBASIC are amd64-only upstream).
+with Verilog added; two cases — testbench-in-stdin and empty-stdin
+self-contained): **23 PASS / 0 FAIL / 0 SKIP** on amd64; **21 PASS /
+0 FAIL / 2 SKIP** on arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
