@@ -113,5 +113,14 @@ else
     echo "[entrypoint] cgroup v2 setup unavailable; isolate stays in rlimit mode (memory limits enforced as virtual address)"
 fi
 
+# isolate v2 (ioi/isolate) ships num_boxes=1000 by default. IsolateJob uses
+# `submission.id % INT_MAX` as the box id, so any submission id >= 1000
+# fails with "Sandbox ID out of range". The legacy judge0/isolate fork that
+# the upstream compilers/Dockerfile used had this patched to INT_MAX; that
+# patch was lost when compilers/NewtonDockerfile-v2 switched to ioi/isolate.
+# TODO: move into compilers image (sed default.cf before `make install`) on
+# next compiler base bump and drop this line.
+sed -i 's/^num_boxes\s*=.*/num_boxes = 2147483647/' /usr/local/etc/isolate
+
 cron
 exec "$@"
