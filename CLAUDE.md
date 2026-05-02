@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.27` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.28` | what we layer on |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -84,21 +84,22 @@ language ids exist and what they invoke. Editing it requires a
   (or set `JAVA_OPTS` for launcher scripts). Without this the JVM sees
   host nproc and spawns threadpools that hit `RLIMIT_NPROC` inside the
   sandbox → `pthread_create EAGAIN`.
-- **GCC id 50 (C) / 54 (C++)** alias to `/usr/local/gcc-9.5.0/...` —
-  the legacy compiler kept alongside GCC 14 for back-compat with old
-  student code. New submissions should use **id 3003 (C / GCC 14.2.0)**
-  or **id 3004 (C++ / GCC 14.2.0)**.
+- **GCC id 50 (C) / 54 (C++)** are the only C/C++ toolchain entries in
+  active.rb. Both point to `/usr/local/gcc-9.5.0/...`. The GCC 14 path
+  (ids 3003/3004) was archived in 0.64 since production submissions
+  never adopted it; the lenient flags on id 50 keep legacy student code
+  compiling on the 9.x diagnostic surface that's still in the image.
 
 ## Build commands
 
 ```bash
 # arm64 (Mac dev)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.63 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.64 --load .
 
 # amd64 (EC2 / prod)
 docker buildx build --platform linux/amd64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.63 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.64 --load .
 ```
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
@@ -112,7 +113,7 @@ images are old and may not start on current Docker Desktop, so:
 ```bash
 # Build the app image first (once, then re-run only when Gemfile/Dockerfile changes)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.63 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.64 --load .
 
 # Bring up only the essentials (skip nginx + resque-web + pgbouncer)
 docker compose -f docker-compose.dev.yml up -d judge0 db redis redis-sidecar
@@ -139,7 +140,7 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world for every active language id. Expected:
-**20 PASS / 0 FAIL / 0 SKIP** on amd64; **18 PASS / 0 FAIL / 2 SKIP** on
+**21 PASS / 0 FAIL / 0 SKIP** on amd64; **19 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 ## judge0.conf knobs (set during 0.26 modernisation)
@@ -206,7 +207,8 @@ in `judge0.conf` explain each. Summary:
 - Phase-4 cgroup-mode tag: `0.60` (isolate v2 cgroup-v2 enforcement, RSS-based memory limits) — superseded
 - Phase-4 bounds tag: `0.61` (language id rename 1001/1002 → 3003/3004, bounds-test, `--open-files` knob) — superseded
 - Phase-4 cgroup-reset tag: `0.62` (reset cgroup between compile and run to fix cpu.stat / memory.peak leak from compile into run) — superseded
-- Phase-4 Node-12 archive tag: `0.63` (correctly archive id 63 Node 12.14.0 — was leaking back as active on every pod boot due to a stray `is_archived: false`) — current
+- Phase-4 Node-12 archive tag: `0.63` (correctly archive id 63 Node 12.14.0 — was leaking back as active on every pod boot due to a stray `is_archived: false`) — superseded
+- Phase-4 0.28-base tag: `0.64` (compiler base bumped to 0.28: GCC 14 archived, Kotlin 2.3.21 / Scala 3.8.3 / Plain Text revived as active language ids 78/81/43; smoke-test + Postman collection updated; nand2tetris-web-ide pinned by SHA upstream) — current
 - Production currently runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
   unrelated to Docker Hub tags. Modernisation will roll prod after staging soak.
 

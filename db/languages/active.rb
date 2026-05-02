@@ -1,6 +1,15 @@
 @languages ||= []
 @languages +=
 [
+  # 0.28: Plain Text restored (was archived in 0.59 trim). Needs no
+  # toolchain — just `cat` of the submitted source file.
+  {
+    id: 43,
+    name: "Plain Text",
+    is_archived: false,
+    source_file: "text.txt",
+    run_cmd: "/bin/cat text.txt"
+  },
   {
     id: 45,
     name: "Assembly (NASM 2.16.03)",
@@ -24,10 +33,10 @@
     compile_cmd: "/usr/local/fbc-1.10.1/bin/fbc %s main.bas",
     run_cmd: "./main"
   },
-  # id 50 (C / GCC 9.5.0) is the legacy compiler kept in the image alongside
-  # GCC 14. New submissions should prefer id 3003 (C / GCC 14.2.0). Lenient
-  # flags soften GCC-9-vs-GCC-14 warning-promoted-to-error breakage where a
-  # student's old code is eventually re-run on the modern compiler.
+  # 0.28: GCC 14.2.0 was removed from the compilers image (no production
+  # submissions ever targeted ids 3003/3004); GCC 9.5.0 is now the sole
+  # C/C++ toolchain. Lenient flags retained so legacy student code that
+  # would have promoted to errors on GCC 14 keeps compiling on 9.5.
   {
     id: 50,
     name: "C (GCC 9.5.0)",
@@ -96,6 +105,18 @@
     compile_cmd: "/usr/local/node-22.11.0/bin/tsc %s script.ts",
     run_cmd: "/usr/local/node-22.11.0/bin/node script.js"
   },
+  # 0.28: Kotlin restored (was archived in 0.59 trim). `kotlinc Main.kt`
+  # produces MainKt.class (Kotlin's top-level-fun-to-class mangling); the
+  # `kotlin` wrapper script handles classpath setup including the stdlib
+  # jar and execs java internally.
+  {
+    id: 78,
+    name: "Kotlin (2.3.21)",
+    is_archived: false,
+    source_file: "Main.kt",
+    compile_cmd: "/usr/local/kotlin-2.3.21/bin/kotlinc %s Main.kt",
+    run_cmd: "/usr/local/kotlin-2.3.21/bin/kotlin MainKt"
+  },
   {
     id: 80,
     name: "R (4.5.2)",
@@ -103,30 +124,24 @@
     source_file: "script.r",
     run_cmd: "/usr/local/r-4.5.2/bin/Rscript script.r"
   },
+  # 0.28: Scala 3 restored (was archived in 0.59 trim). Scala 3.5+ replaced
+  # the legacy `scala` runner with a scala-cli launcher that expects
+  # sources, not classnames, so we run via `java` directly with the Scala
+  # stdlib jars on the classpath (matches bin/newton-test in compilers).
+  {
+    id: 81,
+    name: "Scala 3 (3.8.3)",
+    is_archived: false,
+    source_file: "Main.scala",
+    compile_cmd: "/usr/local/scala-3.8.3/bin/scalac %s Main.scala",
+    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/scala-3.8.3/lib/*\" Main"
+  },
   {
     id: 82,
     name: "SQL (SQLite 3.47.0)",
     is_archived: false,
     source_file: "script.sql",
     run_cmd: "/bin/cat script.sql | /usr/local/sqlite-autoconf-3470000/bin/sqlite3 db.sqlite"
-  },
-  # New IDs for current GCC 14 — same lenient flags so new student code is
-  # tolerant of legacy idioms while new submissions get the modern compiler.
-  {
-    id: 3003,
-    name: "C (GCC 14.2.0)",
-    is_archived: false,
-    source_file: "main.c",
-    compile_cmd: "/usr/local/gcc-14.2.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
-    run_cmd: "./a.out"
-  },
-  {
-    id: 3004,
-    name: "C++ (GCC 14.2.0)",
-    is_archived: false,
-    source_file: "main.cpp",
-    compile_cmd: "/usr/local/gcc-14.2.0/bin/g++ %s main.cpp",
-    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-14.2.0/lib64 ./a.out"
   },
   {
     id: 1999,

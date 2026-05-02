@@ -408,13 +408,9 @@
   # compiler:0.27 — the run_cmd paths kept here are historical context for
   # any future revival. To revive: restore the install RUN to the compilers
   # Dockerfile and copy this entry back into active.rb with is_archived:false.
-  {
-    id: 43,
-    name: "Plain Text",
-    is_archived: true,
-    source_file: "text.txt",
-    run_cmd: "/bin/cat text.txt"
-  },
+  #
+  # 0.28 update: ids 43 (Plain Text), 78 (Kotlin), 81 (Scala 3) revived
+  # for re-introduced course tracks — see active.rb.
   {
     id: 44,
     name: "Executable",
@@ -538,28 +534,12 @@
     run_cmd: "LD_LIBRARY_PATH=/usr/local/gnucobol-3.2/lib ./main"
   },
   {
-    id: 78,
-    name: "Kotlin (2.1.0)",
-    is_archived: true,
-    source_file: "Main.kt",
-    compile_cmd: "/usr/local/kotlin-2.1.0/bin/kotlinc %s Main.kt",
-    run_cmd: "/usr/local/kotlin-2.1.0/bin/kotlin MainKt"
-  },
-  {
     id: 79,
     name: "Objective-C (Clang 19)",
     is_archived: true,
     source_file: "main.m",
     compile_cmd: "/usr/bin/clang-19 `gnustep-config --objc-flags | sed 's/-W[^ ]* //g'` `gnustep-config --base-libs | sed 's/-shared-libgcc//'` main.m %s",
     run_cmd: "./a.out"
-  },
-  {
-    id: 81,
-    name: "Scala 3 (3.6.2)",
-    is_archived: true,
-    source_file: "Main.scala",
-    compile_cmd: "/usr/local/scala-3.6.2/bin/scalac %s Main.scala",
-    run_cmd: "/usr/local/bin/java -cp \".:/usr/local/scala-3.6.2/lib/*\" Main"
   },
   {
     id: 83,
@@ -595,5 +575,27 @@
     id: 89,
     name: "Multi-file program",
     is_archived: true,
+  },
+  # Archived in 0.64 (compilers 0.28): GCC 14.2.0 was removed from the
+  # compilers image — production submissions never adopted these ids and
+  # the second toolchain was paying ~45 min compile + ~1 GB image. The
+  # compile_cmd paths still reference /usr/local/gcc-14.2.0/, which no
+  # longer exists in the image; entries are kept here purely as
+  # historical context for any future revival of GCC 14.
+  {
+    id: 3003,
+    name: "C (GCC 14.2.0)",
+    is_archived: true,
+    source_file: "main.c",
+    compile_cmd: "/usr/local/gcc-14.2.0/bin/gcc -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types %s main.c",
+    run_cmd: "./a.out"
+  },
+  {
+    id: 3004,
+    name: "C++ (GCC 14.2.0)",
+    is_archived: true,
+    source_file: "main.cpp",
+    compile_cmd: "/usr/local/gcc-14.2.0/bin/g++ %s main.cpp",
+    run_cmd: "LD_LIBRARY_PATH=/usr/local/gcc-14.2.0/lib64 ./a.out"
   }
 ]

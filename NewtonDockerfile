@@ -1,4 +1,4 @@
-FROM newtonschool/judge0-newton-compiler:0.27 AS production
+FROM newtonschool/judge0-newton-compiler:0.28 AS production
 
 
 ENV JUDGE0_HOMEPAGE "https://judge0-public.newtonschool.co/"
@@ -37,7 +37,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 # Step 2: OpenSSL 1.1.1w
-# Compiler image 0.27 ships only Ruby 3.3.6 (for student-facing Ruby
+# Compiler image 0.28 ships only Ruby 3.3.6 (for student-facing Ruby
 # submissions, language id 72). The Rails app stays on Rails 5 + Ruby 2.7
 # in this PR; a Rails major-version upgrade is out of scope here. Bookworm
 # ships OpenSSL 3 only, but Ruby 2.7's bundled openssl extension does not
@@ -82,11 +82,13 @@ RUN echo "gem: --no-document" > /root/.gemrc && \
 ENV VIRTUAL_PORT 2358
 EXPOSE $VIRTUAL_PORT
 
-# (Compiler image 0.27 dropped .NET / SBCL / FPC / DMD; the dotnet-script
-# install + pre-warm + arch-divergent path symlinks that lived here are
-# gone with them. C# (51) and F# (87) remain in archived.rb and are gated
-# behind a future isolate cgroup-mode revival; SBCL/Pascal/D were archived
-# in 0.59 for low prod usage.)
+# (Compiler image 0.27 dropped .NET / SBCL / FPC / DMD; 0.28 additionally
+# dropped GCC 14.2 (only GCC 9.5 remains for C/C++) and re-added Kotlin
+# 2.3.21 + Scala 3.8.3. The dotnet-script install + pre-warm + arch-
+# divergent path symlinks that lived here are gone with them. C# (51) and
+# F# (87) remain in archived.rb and are gated behind a future isolate
+# cgroup-mode revival; SBCL/Pascal/D were archived in 0.59 for low prod
+# usage; ids 3003/3004 (GCC 14 C/C++) archived in 0.64.)
 
 WORKDIR /api
 
