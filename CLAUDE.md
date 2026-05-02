@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.28` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.29` | what we layer on |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -46,7 +46,7 @@ compilers image). Don't conflate them.
 │   └── migrate/                     # rails migrations (don't add new ones lightly)
 ├── app/jobs/isolate_job.rb          # the sandbox runner — most complex Ruby in the repo
 ├── app/controllers/submissions_controller.rb
-├── cron/{clear_cache,telemetry}     # baked-in cron entries
+├── cron/{clear_cache,telemetry}     # baked-in cron entries; expect /api/tmp/environment from scripts/load-config
 └── config/                          # standard Rails 5 config layout
 ```
 
@@ -67,7 +67,7 @@ compilers image). Don't conflate them.
 language ids exist and what they invoke. Editing it requires a
 `rails db:seed` to take effect (which `scripts/server` runs on startup).
 
-## Per-language tuning conventions (set during 0.26 modernisation)
+## Per-language tuning conventions
 
 - **C / Fortran compile commands** carry lenient flags so GCC-9-era
   student code still compiles on GCC 14 (which promoted four warnings to
@@ -97,21 +97,31 @@ language ids exist and what they invoke. Editing it requires a
   java subprocess. UseSerialGC is not optional — it's the difference
   between a ~480 MB and a ~600 MB resident footprint.
 - **GCC id 50 (C) / 54 (C++)** are the only C/C++ toolchain entries in
-  active.rb. Both point to `/usr/local/gcc-9.5.0/...`. The GCC 14 path
-  (ids 3003/3004) was archived in 0.64 since production submissions
-  never adopted it; the lenient flags on id 50 keep legacy student code
-  compiling on the 9.x diagnostic surface that's still in the image.
+  active.rb (both point to `/usr/local/gcc-9.5.0/...`). Ids 3003/3004
+  (GCC 14) live in `archived.rb`. See `compilers/CLAUDE.md` for why the
+  image ships only 9.5.
+- **Verilog id 3005 (Icarus 13.0)** uses an unusual two-file submission
+  model: `source_code` is the student's DUT, `stdin` is the
+  instructor-supplied testbench. `compile_cmd` parse-checks the DUT
+  alone with `iverilog -tnull` (so DUT syntax errors go to the Compile
+  Error bucket); `run_cmd` does `cat > tb.v && iverilog ... && vvp ...`
+  and forwards vvp's stdout verbatim — no filtering. Problem authors
+  must capture `expected_output` by running their testbench and
+  including everything vvp prints, including the
+  `tb.v:N: $finish called at T (1s)` epilogue (or use `$finish(0);` in
+  the testbench to suppress that line at source). Full design rationale
+  in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
 
 ## Build commands
 
 ```bash
 # arm64 (Mac dev)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.65 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.66 --load .
 
 # amd64 (EC2 / prod)
 docker buildx build --platform linux/amd64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.65 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.66 --load .
 ```
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
@@ -119,15 +129,13 @@ from source; the rest is bundle install).
 
 ## Dev workflow
 
-`docker-compose.dev.yml` brings up the full stack. nginx and resque-web
-images are old and may not start on current Docker Desktop, so:
+Build the image first (see Build commands above; re-run only when
+`Gemfile` or `NewtonDockerfile` changes). Then bring up the stack —
+`docker-compose.dev.yml` includes nginx and resque-web images that are
+old and may not start on current Docker Desktop, so skip those:
 
 ```bash
-# Build the app image first (once, then re-run only when Gemfile/Dockerfile changes)
-docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.65 --load .
-
-# Bring up only the essentials (skip nginx + resque-web + pgbouncer)
+# Essentials only (skip nginx + resque-web + pgbouncer)
 docker compose -f docker-compose.dev.yml up -d judge0 db redis redis-sidecar
 
 # Start workers in the judge0 container (separate exec session)
@@ -151,13 +159,18 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Expected:
-**21 PASS / 0 FAIL / 0 SKIP** on amd64; **19 PASS / 0 FAIL / 2 SKIP** on
-arm64 (NASM and FreeBASIC are amd64-only upstream).
+Submits a hello-world for every active language id. Expected (post-0.66
+with Verilog added; two cases — testbench-in-stdin and empty-stdin
+self-contained): **23 PASS / 0 FAIL / 0 SKIP** on amd64; **21 PASS /
+0 FAIL / 2 SKIP** on arm64 (NASM and FreeBASIC are amd64-only upstream).
 
-## judge0.conf knobs (set during 0.26 modernisation)
+Rspec tests in `spec/` are mostly upstream — Newton has not added
+comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
+validation; use `bin/newton-smoke-test`.
 
-These are Newton overrides on top of upstream defaults. Comments inline
+## judge0.conf knobs
+
+Newton overrides on top of upstream defaults. Comments inline
 in `judge0.conf` explain each. Summary:
 
 | Setting | Default | Newton | Why |
@@ -171,7 +184,7 @@ in `judge0.conf` explain each. Summary:
 | `MAX_FILE_SIZE` | 1 MB | **1 GiB** | Go 1.23 binaries + Java class+jar bundles can exceed 1 MB |
 | `MAX_MAX_FILE_SIZE` | 4 MB | **2 GiB** | per-submission max |
 
-## Common pitfalls (encountered while building 0.26 + Phase 2 — don't repeat)
+## Common pitfalls
 
 1. **Compose env vars are overridden by `judge0.conf`.** `scripts/load-config`
    does `set -o allexport; source $CONFIG_FILE` which clobbers anything you
@@ -213,32 +226,12 @@ in `judge0.conf` explain each. Summary:
 ## Image is published as
 
 - Docker Hub: `newtonschool/newton-judge0`
-- Pre-modernisation staging tag: `0.53` (compiler base 0.25)
-- Phase-2 modernisation tag: `0.58` (compiler base 0.26) — superseded
-- Phase-3 trim tag: `0.59` (compiler base 0.27, 25 low-usage langs archived) — superseded
-- Phase-4 cgroup-mode tag: `0.60` (isolate v2 cgroup-v2 enforcement, RSS-based memory limits) — superseded
-- Phase-4 bounds tag: `0.61` (language id rename 1001/1002 → 3003/3004, bounds-test, `--open-files` knob) — superseded
-- Phase-4 cgroup-reset tag: `0.62` (reset cgroup between compile and run to fix cpu.stat / memory.peak leak from compile into run) — superseded
-- Phase-4 Node-12 archive tag: `0.63` (correctly archive id 63 Node 12.14.0 — was leaking back as active on every pod boot due to a stray `is_archived: false`) — superseded
-- Phase-4 0.28-base tag: `0.64` (compiler base bumped to 0.28: GCC 14 archived, Kotlin 2.3.21 / Scala 3.8.3 / Plain Text revived as active language ids 78/81/43; smoke-test + Postman collection updated; nand2tetris-web-ide pinned by SHA upstream) — superseded
-- Phase-4 Kotlin-tuning tag: `0.65` (kotlinc compile_cmd carries `-J-Xmx384m -J-XX:MaxMetaspaceSize=80m -J-XX:ReservedCodeCacheSize=32m -J-XX:+UseSerialGC` so the JVM fits inside isolate's hardcoded 500 MB compile cgroup; smoke-test now detects target arch via /system_info instead of `uname -m`) — current; **smoke green on staging 21/0/0**
-- Production currently runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
-  unrelated to Docker Hub tags. Modernisation will roll prod after staging soak.
-
-## Production deploy model
-
-The user explicitly chose **single-image deployment** for prod (no
-docker-compose). The deployed `newton-judge0:<tag>` connects to managed
-Postgres + managed Redis from the environment. `docker-compose.dev.yml`
-is dev-only convenience.
-
-## Working notes
-
-- Rspec tests in `spec/` exist but are mostly upstream — Newton has not
-  added comprehensive specs. Don't rely on `bundle exec rspec` for
-  end-to-end validation; use `bin/newton-smoke-test` instead.
-- `cron/clear_cache` and `cron/telemetry` are installed via crontab
-  during image build. They expect `/api/tmp/environment` to exist
-  (created by `scripts/load-config`).
-- Migrations are append-only; the latest is from 2023-03-09. Don't
-  modify old migrations.
+- Current tag: **`0.66`** — compiler base 0.29 (adds Icarus Verilog 13.0
+  for new language id 3005). Smoke target 22/0/0 on amd64.
+- Production runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
+  pre-modernisation. Deploys are **single-image** (no docker-compose); the deployed
+  `newton-judge0:<tag>` connects to managed Postgres + managed Redis from the environment.
+- **Before bumping prod to 0.66:** prod nodes still run Amazon Linux 2 (cgroup v1).
+  Flip the karpenter NodeClass to AL2023 first — otherwise `docker-entrypoint.sh`'s
+  cgroup-v2 setup falls back silently to rlimit mode and you lose RSS-based limits.
+- See `git log` for the 0.53 → 0.66 chronology if you need to bisect a regression.

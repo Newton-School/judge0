@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "f3a8c2e1-9d4b-4b6f-a7e2-5c1d8e9f0a01",
-    "name": "Newton Judge0 — All Languages (0.65)",
+    "name": "Newton Judge0 — All Languages (0.66)",
     "description": "End-to-end smoke for every active language id in db/languages/active.rb.\nMirrors bin/newton-smoke-test as importable Postman requests.\n\nUsage:\n  1. Import this file in Postman.\n  2. Edit the collection variable `base_url` to point at your environment\n     (e.g. http://localhost:2358 for dev, https://judge0.newtonschool.co for prod).\n  3. Run individual requests, or use the Collection Runner to execute all.\n\nAll requests use `?wait=true` so the response is the final submission result\n(no polling loop). Each request has a Tests script that asserts:\n  - HTTP 201\n  - status.description === \"Accepted\"\n  - stdout contains \"Hello, Newton!\"\n\nOnly currently-active languages are tested here. See db/languages/archived.rb\nfor retired ids — submitting any of those returns a 422 'language is archived'.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -312,6 +312,26 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
             "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3002,\n  \"source_code\": \"class Main {\\n    function int addPair(int x, int y) {\\n        var int a, b, result;\\n        let a = x;\\n        let b = y;\\n        let result = a + b;\\n        return result;\\n    }\\n}\",\n  \"stdin\": \"load Main.vm,\\n\\nset sp 256,\\nset local 300,\\nset argument 400,\\nset this 3000,\\nset that 4000,\\nset argument[0] 11,\\nset argument[1] 5,\\n\\nrepeat 10 {\\nvmstep;\\n}\\n\\noutput-list RAM[0]%D1.6.1 RAM[300]%D1.6.1;\\noutput;\"\n}"}
+          }
+        },
+        {
+          "name": "Verilog Icarus 13.0 (3005)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout has greeting\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3005,\n  \"source_code\": \"module inv(input a, output b);\\n  assign b = ~a;\\nendmodule\",\n  \"stdin\": \"module testbench;\\n  reg a;\\n  wire b;\\n  inv dut(a, b);\\n  initial begin\\n    a = 0;\\n    #1 $display(\\\"Hello, Newton!\\\");\\n    $finish(0);\\n  end\\nendmodule\"\n}"}
+          }
+        },
+        {
+          "name": "Verilog 3005 self-contained / empty stdin",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout has greeting\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3005,\n  \"source_code\": \"module testbench;\\n  initial begin\\n    $display(\\\"Hello, Newton!\\\");\\n    $finish(0);\\n  end\\nendmodule\",\n  \"stdin\": \"\"\n}"}
           }
         }
       ]

@@ -185,5 +185,24 @@
     is_archived: false,
     source_file: "Main.jack",
     run_cmd: "nand2tetris run Main.jack"
+  },
+  # Verilog (Icarus 13.0): student submits the DUT module(s) as source_code;
+  # instructor-supplied testbench arrives via stdin. compile_cmd parse-checks
+  # the DUT alone with `iverilog -tnull` so pure DUT syntax errors land in
+  # the Compile Error bucket. run_cmd captures stdin to tb.v, full-elaborates
+  # main.v + tb.v (no -s flag — iverilog auto-detects the testbench module
+  # as top-level), runs vvp, and forwards vvp's stdout verbatim. Problem
+  # authors must capture expected_output by running their testbench and
+  # including whatever vvp prints — including the volatile
+  # `tb.v:N: $finish called at T (1s)` epilogue. To suppress that epilogue,
+  # use `$finish(0);` instead of `$finish;` in the testbench.
+  # See docs/superpowers/specs/2026-05-02-iverilog-integration-design.md.
+  {
+    id: 3005,
+    name: "Verilog (Icarus 13.0)",
+    is_archived: false,
+    source_file: "main.v",
+    compile_cmd: "/usr/local/iverilog-13.0/bin/iverilog -g2012 -tnull %s main.v",
+    run_cmd: "/bin/cat > tb.v && /usr/local/iverilog-13.0/bin/iverilog -g2012 -o sim.vvp main.v tb.v && /usr/local/iverilog-13.0/bin/vvp sim.vvp"
   }
 ]
