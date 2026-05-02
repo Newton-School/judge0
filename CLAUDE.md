@@ -117,11 +117,11 @@ language ids exist and what they invoke. Editing it requires a
 ```bash
 # arm64 (Mac dev)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.65 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.66 --load .
 
 # amd64 (EC2 / prod)
 docker buildx build --platform linux/amd64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.65 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.66 --load .
 ```
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
