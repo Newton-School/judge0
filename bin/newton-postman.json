@@ -1,0 +1,320 @@
+{
+  "info": {
+    "_postman_id": "f3a8c2e1-9d4b-4b6f-a7e2-5c1d8e9f0a01",
+    "name": "Newton Judge0 — All Languages (0.65)",
+    "description": "End-to-end smoke for every active language id in db/languages/active.rb.\nMirrors bin/newton-smoke-test as importable Postman requests.\n\nUsage:\n  1. Import this file in Postman.\n  2. Edit the collection variable `base_url` to point at your environment\n     (e.g. http://localhost:2358 for dev, https://judge0.newtonschool.co for prod).\n  3. Run individual requests, or use the Collection Runner to execute all.\n\nAll requests use `?wait=true` so the response is the final submission result\n(no polling loop). Each request has a Tests script that asserts:\n  - HTTP 201\n  - status.description === \"Accepted\"\n  - stdout contains \"Hello, Newton!\"\n\nOnly currently-active languages are tested here. See db/languages/archived.rb\nfor retired ids — submitting any of those returns a 422 'language is archived'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:2358",
+      "description": "Judge0 API root. Override per-environment."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /languages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/languages",
+              "host": ["{{base_url}}"],
+              "path": ["languages"]
+            }
+          }
+        },
+        {
+          "name": "GET /system_info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/system_info",
+              "host": ["{{base_url}}"],
+              "path": ["system_info"]
+            }
+          }
+        },
+        {
+          "name": "GET /config_info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/config_info",
+              "host": ["{{base_url}}"],
+              "path": ["config_info"]
+            }
+          }
+        },
+        {
+          "name": "GET /workers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/workers",
+              "host": ["{{base_url}}"],
+              "path": ["workers"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shell / scripting",
+      "item": [
+        {
+          "name": "Bash 5.2.37 (46)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 46,\n  \"source_code\": \"echo \\\"Hello, Newton!\\\"\"\n}"}
+          }
+        },
+        {
+          "name": "Python 3.13.1 (71)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 71,\n  \"source_code\": \"print(\\\"Hello, Newton!\\\")\"\n}"}
+          }
+        },
+        {
+          "name": "Python 3.12.7 ML (2000)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 2000,\n  \"source_code\": \"import os\\nos.environ[\\\"OPENBLAS_NUM_THREADS\\\"] = \\\"1\\\"\\nprint(\\\"Hello, Newton!\\\")\"\n}"}
+          }
+        },
+        {
+          "name": "Ruby 3.3.6 (72)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 72,\n  \"source_code\": \"puts \\\"Hello, Newton!\\\"\"\n}"}
+          }
+        },
+        {
+          "name": "Node.js 22.11.0 (1999)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 1999,\n  \"source_code\": \"console.log(\\\"Hello, Newton!\\\")\"\n}"}
+          }
+        },
+        {
+          "name": "TypeScript 5.7.2 (74)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 74,\n  \"source_code\": \"console.log(\\\"Hello, Newton!\\\");\"\n}"}
+          }
+        },
+        {
+          "name": "R 4.5.2 (80)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 80,\n  \"source_code\": \"cat(\\\"Hello, Newton!\\\\n\\\")\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "C / C++",
+      "item": [
+        {
+          "name": "C GCC 9.5 (50)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 50,\n  \"source_code\": \"#include <stdio.h>\\nint main(void) { printf(\\\"Hello, Newton!\\\\n\\\"); return 0; }\"\n}"}
+          }
+        },
+        {
+          "name": "C++ GCC 9.5 (54)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 54,\n  \"source_code\": \"#include <iostream>\\nint main() { std::cout << \\\"Hello, Newton!\\\" << std::endl; return 0; }\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "JVM",
+      "item": [
+        {
+          "name": "Java OpenJDK 21 (62)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 62,\n  \"source_code\": \"public class Main {\\n    public static void main(String[] a) {\\n        System.out.println(\\\"Hello, Newton!\\\");\\n    }\\n}\"\n}"}
+          }
+        },
+        {
+          "name": "Kotlin 2.3.21 (78)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 78,\n  \"source_code\": \"fun main() { println(\\\"Hello, Newton!\\\") }\"\n}"}
+          }
+        },
+        {
+          "name": "Scala 3.8.3 (81)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 81,\n  \"source_code\": \"object Main { def main(args: Array[String]): Unit = println(\\\"Hello, Newton!\\\") }\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Compiled",
+      "item": [
+        {
+          "name": "Go 1.23.4 (60)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 60,\n  \"source_code\": \"package main\\nimport \\\"fmt\\\"\\nfunc main() { fmt.Println(\\\"Hello, Newton!\\\") }\"\n}"}
+          }
+        },
+        {
+          "name": "Rust 1.83.0 (73)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 73,\n  \"source_code\": \"fn main() { println!(\\\"Hello, Newton!\\\"); }\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "SQL",
+      "item": [
+        {
+          "name": "SQLite 3.47.0 (82)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 82,\n  \"source_code\": \"SELECT 'Hello, Newton!';\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Plain text",
+      "item": [
+        {
+          "name": "Plain Text (43)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 43,\n  \"source_code\": \"Hello, Newton!\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Architecture-specific (amd64 only)",
+      "item": [
+        {
+          "name": "NASM 2.16.03 (45)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 45,\n  \"source_code\": \"section .data\\n    msg db \\\"Hello, Newton!\\\", 10\\n    len equ $ - msg\\nsection .text\\nglobal _start\\n_start:\\n    mov rax, 1\\n    mov rdi, 1\\n    mov rsi, msg\\n    mov rdx, len\\n    syscall\\n    mov rax, 60\\n    xor rdi, rdi\\n    syscall\"\n}"}
+          }
+        },
+        {
+          "name": "FreeBASIC 1.10.1 (47)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 47,\n  \"source_code\": \"print \\\"Hello, Newton!\\\"\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Newton extras",
+      "item": [
+        {
+          "name": "MIPS Mars 4.5 (3001)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .data\\nmsg:    .asciiz \\\"Hello, Newton!\\\\n\\\"\\n        .text\\nmain:\\n        li      $v0, 4\\n        la      $a0, msg\\n        syscall\\n        li      $v0, 10\\n        syscall\"\n}"}
+          }
+        },
+        {
+          "name": "HDL Nand2Tetris (3000)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"truth table row\", () => pm.expect(pm.response.json().stdout).to.include(\"|   1   |   0   |   0   |   1   |\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3000,\n  \"source_code\": \"CHIP Mux {\\n    IN a, b, sel;\\n    OUT out;\\n\\n    PARTS:\\n    Not(in=sel, out=notSel);\\n    And(a=a, b=notSel, out=abnot);\\n    And(a=b, b=sel, out=ab);\\n    Or(a=abnot, b=ab, out=out);\\n}\",\n  \"stdin\": \"output-list a%B3.1.3 b%B3.1.3 sel%B3.1.3 out%B3.1.3;\\nset a 1, set b 0, set sel 0, eval, output;\\nset a 1, set b 0, set sel 1, eval, output;\"\n}"}
+          }
+        },
+        {
+          "name": "Jack (3002)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"VM RAM dump\", () => pm.expect(pm.response.json().stdout).to.include(\"|    401 |     11 |\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3002,\n  \"source_code\": \"class Main {\\n    function int addPair(int x, int y) {\\n        var int a, b, result;\\n        let a = x;\\n        let b = y;\\n        let result = a + b;\\n        return result;\\n    }\\n}\",\n  \"stdin\": \"load Main.vm,\\n\\nset sp 256,\\nset local 300,\\nset argument 400,\\nset this 3000,\\nset that 4000,\\nset argument[0] 11,\\nset argument[1] 5,\\n\\nrepeat 10 {\\nvmstep;\\n}\\n\\noutput-list RAM[0]%D1.6.1 RAM[300]%D1.6.1;\\noutput;\"\n}"}
+          }
+        }
+      ]
+    }
+  ]
+}

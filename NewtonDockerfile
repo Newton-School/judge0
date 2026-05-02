@@ -1,4 +1,4 @@
-FROM newtonschool/judge0-newton-compiler:0.25 AS production
+FROM newtonschool/judge0-newton-compiler:0.28 AS production
 
 
 ENV JUDGE0_HOMEPAGE "https://judge0-public.newtonschool.co/"
@@ -10,26 +10,85 @@ LABEL source_code=$JUDGE0_SOURCE_CODE
 ENV JUDGE0_MAINTAINER "Gaurav Kapatia <gkapatia@newtonschool.co>"
 LABEL maintainer=$JUDGE0_MAINTAINER
 
-ENV PATH "/usr/local/ruby-2.7.0/bin:/opt/.gem/bin:$PATH"
-ENV GEM_HOME "/opt/.gem/"
-
 USER root
 
-RUN sed -i 's|deb.debian.org/debian|archive.debian.org/debian|g; \
-            s|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
-
-RUN apt-get update && \
+# Step 1: Rails app's system packages.
+# In some Docker Desktop / buildkit environments, apt-key+gpgv fails to
+# verify InRelease signatures even though the canonical keyring is valid
+# ("At least one invalid signature was encountered", exit 100). On builds
+# where apt verification works (EC2, CI), the first `apt-get update`
+# succeeds and the fallback is never taken. On affected builds, we fall
+# back to legacy [trusted=yes] sources so the build can complete.
+# (TLS still authenticates the upstream mirror.)
+RUN set -eux; \
+    if ! apt-get update; then \
+        echo ">> apt-get update failed; falling back to [trusted=yes] sources"; \
+        rm -f /etc/apt/sources.list.d/debian.sources; \
+        printf 'deb [trusted=yes] http://deb.debian.org/debian bookworm main\ndeb [trusted=yes] http://deb.debian.org/debian bookworm-updates main\ndeb [trusted=yes] http://deb.debian.org/debian-security bookworm-security main\n' > /etc/apt/sources.list.d/debian.list; \
+        if [ -f /etc/apt/sources.list.d/llvm.list ]; then \
+            sed -i 's|deb http|deb [trusted=yes] http|g' /etc/apt/sources.list.d/llvm.list; \
+        fi; \
+        apt-get update; \
+    fi; \
     apt-get install -y --no-install-recommends \
       cron \
       libpq-dev \
-      sudo && \
-    rm -rf /var/lib/apt/lists/* && \
-    echo "gem: --no-document" > /root/.gemrc && \
+      sudo; \
+    rm -rf /var/lib/apt/lists/*
+
+# Step 2: OpenSSL 1.1.1w
+# Compiler image 0.28 ships only Ruby 3.3.6 (for student-facing Ruby
+# submissions, language id 72). The Rails app stays on Rails 5 + Ruby 2.7
+# in this PR; a Rails major-version upgrade is out of scope here. Bookworm
+# ships OpenSSL 3 only, but Ruby 2.7's bundled openssl extension does not
+# build against OpenSSL 3 — install fails with "cannot load such file --
+# openssl". So we install OpenSSL 1.1.1 (final 1.1.1w release) under a
+# contained prefix and point Ruby's configure at it. Purely the Rails app
+# runtime; student Ruby submissions use /usr/local/ruby-3.3.6 from the
+# compilers image.
+ENV OPENSSL_LEGACY_VERSION=1.1.1w \
+    APP_RUBY_VERSION=2.7.8
+
+RUN set -xe && \
+    curl -fSsL "https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-${OPENSSL_LEGACY_VERSION}.tar.gz" -o /tmp/openssl.tar.gz && \
+    mkdir /tmp/openssl && tar -xf /tmp/openssl.tar.gz -C /tmp/openssl --strip-components=1 && \
+    cd /tmp/openssl && \
+    ./config --prefix=/usr/local/openssl-${OPENSSL_LEGACY_VERSION} \
+             --openssldir=/usr/local/openssl-${OPENSSL_LEGACY_VERSION} \
+             shared zlib && \
+    make -j"$(nproc)" && make install_sw && \
+    cd / && rm -rf /tmp/openssl /tmp/openssl.tar.gz
+
+# Step 3: Ruby 2.7.8 against OpenSSL 1.1
+RUN set -xe && \
+    curl -fSsL "https://cache.ruby-lang.org/pub/ruby/2.7/ruby-${APP_RUBY_VERSION}.tar.gz" -o /tmp/ruby.tar.gz && \
+    mkdir /tmp/ruby && tar -xf /tmp/ruby.tar.gz -C /tmp/ruby --strip-components=1 && \
+    cd /tmp/ruby && \
+    ./configure \
+        --disable-install-doc \
+        --with-openssl-dir=/usr/local/openssl-${OPENSSL_LEGACY_VERSION} \
+        --prefix=/usr/local/ruby-${APP_RUBY_VERSION} && \
+    make -j"$(nproc)" && make -j"$(nproc)" install && \
+    cd / && rm -rf /tmp/ruby /tmp/ruby.tar.gz
+
+ENV PATH "/usr/local/ruby-${APP_RUBY_VERSION}/bin:/opt/.gem/bin:$PATH"
+ENV GEM_HOME "/opt/.gem/"
+
+# Step 4: bundler + aglio (now Ruby is in PATH)
+RUN echo "gem: --no-document" > /root/.gemrc && \
     gem install bundler:2.1.4 && \
     npm install -g --unsafe-perm aglio@2.3.0
 
 ENV VIRTUAL_PORT 2358
 EXPOSE $VIRTUAL_PORT
+
+# (Compiler image 0.27 dropped .NET / SBCL / FPC / DMD; 0.28 additionally
+# dropped GCC 14.2 (only GCC 9.5 remains for C/C++) and re-added Kotlin
+# 2.3.21 + Scala 3.8.3. The dotnet-script install + pre-warm + arch-
+# divergent path symlinks that lived here are gone with them. C# (51) and
+# F# (87) remain in archived.rb and are gated behind a future isolate
+# cgroup-mode revival; SBCL/Pascal/D were archived in 0.59 for low prod
+# usage; ids 3003/3004 (GCC 14 C/C++) archived in 0.64.)
 
 WORKDIR /api
 
@@ -44,7 +103,7 @@ COPY . .
 ENTRYPOINT ["/api/docker-entrypoint.sh"]
 CMD ["/api/scripts/server"]
 
-ENV JUDGE0_VERSION "1.13.0"
+ENV JUDGE0_VERSION "1.14.0"
 LABEL version=$JUDGE0_VERSION
 
 

@@ -1,0 +1,337 @@
+#!/usr/bin/env bash
+#
+# Newton-owned end-to-end smoke test for the judge0 API.
+#
+# Submits a hello-world program for every active language id in
+# db/languages/active.rb to a running judge0 instance and verifies that:
+#   - the API accepts the submission
+#   - workers pick it up
+#   - the sandbox compiles + runs to "Accepted" status
+#   - stdout contains the expected marker
+#
+# Usage:
+#   ./bin/newton-smoke-test                  # against http://localhost:2358
+#   JUDGE0_URL=http://other:2358 ./bin/newton-smoke-test
+#
+# Prerequisites: jq, curl, a running judge0 stack with at least one Resque
+# worker draining the queue.
+#
+# Exits non-zero if any language fails. Intentionally tolerant of a few
+# languages that need bespoke source (HDL, Jack, Multi-file, Executable);
+# those are SKIPped with a reason.
+
+set -u
+
+URL="${JUDGE0_URL:-http://localhost:2358}"
+EXPECTED="Hello, Newton!"
+# Detect TARGET architecture (where submissions execute) via /system_info,
+# not the local machine — running this from an arm64 Mac against an amd64
+# server should not skip NASM/FreeBASIC.
+ARCH="$(curl -fsS "${URL}/system_info" 2>/dev/null | jq -r '.Architecture // empty')"
+ARCH="${ARCH:-$(uname -m)}"
+
+PASS=0
+FAIL=0
+SKIP=0
+FAILED=()
+SKIPPED=()
+
+if ! command -v jq >/dev/null; then
+    echo "ERROR: jq is required (brew install jq / apt-get install jq)" >&2
+    exit 2
+fi
+
+echo "Submitting against ${URL} (arch=${ARCH})"
+echo
+
+# t <name> <language_id> <source_code>  [<expected_substring>]
+t() {
+    local name="$1" lid="$2" src="$3"
+    local expected="${4:-$EXPECTED}"
+    local payload resp status stdout err
+    payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" \
+        '{language_id:$lid, source_code:$sc}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+# t_mem <name> <language_id> <source_code> <memory_limit_kb> [<expected_substring>]
+# Same as t() but pins an explicit memory_limit on the submission. Used for
+# languages whose compile step needs more than the global default — Kotlin's
+# kotlinc bootstrap blows past 128 MB and gets OOM-killed by the cgroup
+# unless we ask for headroom.
+t_mem() {
+    local name="$1" lid="$2" src="$3" mem="$4"
+    local expected="${5:-$EXPECTED}"
+    local payload resp
+    payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" --argjson mem "$mem" \
+        '{language_id:$lid, source_code:$sc, memory_limit:$mem}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+# t_stdin <name> <language_id> <source_code> <stdin> <expected_substring>
+# Same as t() but also sends a stdin payload — used by HDL where the test
+# script lives in stdin and the chip definition lives in source_code.
+t_stdin() {
+    local name="$1" lid="$2" src="$3" stdin="$4" expected="$5"
+    local payload resp
+    payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
+        '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+_check_resp() {
+    local name="$1" lid="$2" expected="$3" resp="$4"
+    local status stdout err
+    status="$(echo "$resp" | jq -r '.status.description // "?"')"
+    stdout="$(echo "$resp" | jq -r '.stdout // ""')"
+    if [[ "$status" == "Accepted" && "$stdout" == *"$expected"* ]]; then
+        printf "  \033[32mPASS\033[0m  %s\n" "$name"
+        PASS=$((PASS+1))
+    else
+        printf "  \033[31mFAIL\033[0m  %s  status=%s\n" "$name" "$status"
+        if [[ -n "$stdout" ]]; then
+            printf "        stdout: %s\n" "$(echo "$stdout" | head -1)"
+        fi
+        err="$(echo "$resp" | jq -r '.compile_output // .stderr // .message // empty' | head -3 | tr '\n' ' ')"
+        [[ -n "$err" ]] && printf "        err: %s\n" "$err"
+        FAIL=$((FAIL+1))
+        FAILED+=("$name (id $lid, $status)")
+    fi
+}
+
+skip() {
+    local name="$1" reason="$2"
+    printf "  \033[33mSKIP\033[0m  %s  (%s)\n" "$name" "$reason"
+    SKIP=$((SKIP+1))
+    SKIPPED+=("$name: $reason")
+}
+
+section() { printf "\n\033[1m== %s ==\033[0m\n" "$1"; }
+
+# ────────────────────────────────────────────────────────────────────────
+# Source snippets — one per active language.
+# ────────────────────────────────────────────────────────────────────────
+SRC_BASH='echo "Hello, Newton!"'
+
+SRC_C='#include <stdio.h>
+int main(void) { printf("Hello, Newton!\n"); return 0; }'
+
+SRC_CPP='#include <iostream>
+int main() { std::cout << "Hello, Newton!" << std::endl; return 0; }'
+
+SRC_JAVA='public class Main {
+    public static void main(String[] a) {
+        System.out.println("Hello, Newton!");
+    }
+}'
+
+SRC_KOTLIN='fun main() { println("Hello, Newton!") }'
+
+SRC_SCALA='object Main { def main(args: Array[String]): Unit = println("Hello, Newton!") }'
+
+# Plain text — submission body is dumped verbatim by /bin/cat.
+SRC_PLAIN_TEXT='Hello, Newton!'
+
+SRC_GO='package main
+import "fmt"
+func main() { fmt.Println("Hello, Newton!") }'
+
+SRC_RUST='fn main() { println!("Hello, Newton!"); }'
+
+SRC_R='cat("Hello, Newton!\n")'
+
+SRC_PYTHON='print("Hello, Newton!")'
+
+SRC_PYTHON_ML='import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+print("Hello, Newton!")'
+
+SRC_RUBY='puts "Hello, Newton!"'
+
+SRC_TS='console.log("Hello, Newton!");'
+
+SRC_NODE='console.log("Hello, Newton!")'
+
+SRC_SQL="SELECT 'Hello, Newton!';"
+
+SRC_FBC='print "Hello, Newton!"'
+
+# x86_64 Linux syscall hello world
+SRC_NASM='section .data
+    msg db "Hello, Newton!", 10
+    len equ $ - msg
+section .text
+global _start
+_start:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, msg
+    mov rdx, len
+    syscall
+    mov rax, 60
+    xor rdi, rdi
+    syscall'
+
+# MIPS hello world for MARS simulator (uses syscall convention)
+SRC_MIPS='        .data
+msg:    .asciiz "Hello, Newton!\n"
+        .text
+main:
+        li      $v0, 4
+        la      $a0, msg
+        syscall
+        li      $v0, 10
+        syscall'
+
+# HDL: a 2-input Mux chip (idempotent, easy to verify against truth table).
+# stdin carries the .tst script that drives the simulator.
+SRC_HDL='CHIP Mux {
+    IN a, b, sel;
+    OUT out;
+
+    PARTS:
+    Not(in=sel, out=notSel);
+    And(a=a, b=notSel, out=abnot);
+    And(a=b, b=sel, out=ab);
+    Or(a=abnot, b=ab, out=out);
+}'
+
+STDIN_HDL='output-list a%B3.1.3 b%B3.1.3 sel%B3.1.3 out%B3.1.3;
+set a 1, set b 0, set sel 0, eval, output;
+set a 1, set b 0, set sel 1, eval, output;'
+
+# Jack: compiled to nand2tetris .vm, driven by a VM-emulator script in stdin.
+SRC_JACK='class Main {
+    function int addPair(int x, int y) {
+        var int a, b, result;
+        let a = x;
+        let b = y;
+        let result = a + b;
+        return result;
+    }
+}'
+
+STDIN_JACK='load Main.vm,
+
+set sp 256,
+set local 300,
+set argument 400,
+set this 3000,
+set that 4000,
+set argument[0] 11,
+set argument[1] 5,
+
+repeat 10 {
+vmstep;
+}
+
+output-list RAM[0]%D1.6.1 RAM[300]%D1.6.1;
+output;'
+
+# ────────────────────────────────────────────────────────────────────────
+# 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
+# dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
+# section below documents what's gone; submitting any of those returns a
+# 422 "language is archived" from the API.
+#
+# 0.64 (compilers 0.28): GCC 14 ids 3003/3004 archived; Plain Text (43),
+# Kotlin (78), Scala 3 (81) revived for re-introduced course tracks.
+# ────────────────────────────────────────────────────────────────────────
+
+# ────────────────────────────────────────────────────────────────────────
+section "Shell / scripting"
+# ────────────────────────────────────────────────────────────────────────
+t "Bash 5.2.37 (46)"            46   "$SRC_BASH"
+t "Python 3.13.1 (71)"          71   "$SRC_PYTHON"
+t "Python 3.12.7 ML (2000)"     2000 "$SRC_PYTHON_ML"
+t "Ruby 3.3.6 (72)"             72   "$SRC_RUBY"
+t "Node.js 22.11.0 (1999)"      1999 "$SRC_NODE"
+t "TypeScript 5.7.2 (74)"       74   "$SRC_TS"
+t "R 4.5.2 (80)"                80   "$SRC_R"
+
+# ────────────────────────────────────────────────────────────────────────
+section "C / C++"
+# ────────────────────────────────────────────────────────────────────────
+t "C GCC 9.5 (50)"              50   "$SRC_C"
+t "C++ GCC 9.5 (54)"            54   "$SRC_CPP"
+
+# ────────────────────────────────────────────────────────────────────────
+section "JVM"
+# ────────────────────────────────────────────────────────────────────────
+t "Java OpenJDK 21 (62)"        62   "$SRC_JAVA"
+t "Kotlin 2.3.21 (78)"          78   "$SRC_KOTLIN"
+t "Scala 3.8.3 (81)"            81   "$SRC_SCALA"
+
+# ────────────────────────────────────────────────────────────────────────
+section "Compiled"
+# ────────────────────────────────────────────────────────────────────────
+t "Go 1.23.4 (60)"              60   "$SRC_GO"
+t "Rust 1.83.0 (73)"            73   "$SRC_RUST"
+
+# ────────────────────────────────────────────────────────────────────────
+section "SQL"
+# ────────────────────────────────────────────────────────────────────────
+t "SQLite 3.47.0 (82)"          82   "$SRC_SQL"
+
+# ────────────────────────────────────────────────────────────────────────
+section "Plain text"
+# ────────────────────────────────────────────────────────────────────────
+t "Plain Text (43)"             43   "$SRC_PLAIN_TEXT"
+
+# ────────────────────────────────────────────────────────────────────────
+section "Architecture-specific"
+# ────────────────────────────────────────────────────────────────────────
+case "$ARCH" in
+    x86_64|amd64)
+        t "NASM 2.16.03 (45)"   45   "$SRC_NASM"
+        t "FreeBASIC 1.10.1 (47)" 47 "$SRC_FBC"
+        ;;
+    aarch64|arm64)
+        skip "NASM (45)"        "amd64-only at runtime"
+        skip "FreeBASIC (47)"   "amd64-only upstream binary"
+        ;;
+    *)
+        skip "NASM (45)"        "untested arch=$ARCH"
+        skip "FreeBASIC (47)"   "untested arch=$ARCH"
+        ;;
+esac
+
+# ────────────────────────────────────────────────────────────────────────
+section "Newton extras"
+# ────────────────────────────────────────────────────────────────────────
+t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
+
+# HDL drives the chip via a .tst-style script in stdin and prints a
+# truth-table to stdout. With a=1 b=0 sel=0 → out=1 (selecting a).
+t_stdin "HDL Nand2Tetris (3000)"  3000 "$SRC_HDL" "$STDIN_HDL" "|   1   |   0   |   0   |   1   |"
+
+# Jack: source compiles to Main.vm, then a VM-emulator script in stdin
+# steps the function call and dumps RAM cells to stdout.
+t_stdin "Jack (3002)"           3002 "$SRC_JACK" "$STDIN_JACK" "|    401 |     11 |"
+
+# Archived languages are intentionally not tested here — the smoke test
+# verifies the *currently active* surface. See db/languages/archived.rb
+# for what's been retired (and why).
+
+# ────────────────────────────────────────────────────────────────────────
+echo
+printf "\033[1mSummary:\033[0m  \033[32m%d passed\033[0m, \033[31m%d failed\033[0m, \033[33m%d skipped\033[0m\n" \
+    "$PASS" "$FAIL" "$SKIP"
+if (( FAIL > 0 )); then
+    echo
+    printf "\033[1mFailures:\033[0m\n"
+    for f in "${FAILED[@]}"; do printf "  - %s\n" "$f"; done
+fi
+if (( SKIP > 0 )); then
+    echo
+    printf "\033[1mSkipped:\033[0m\n"
+    for s in "${SKIPPED[@]}"; do printf "  - %s\n" "$s"; done
+fi
+
+(( FAIL == 0 ))
