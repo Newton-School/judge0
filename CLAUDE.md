@@ -84,6 +84,18 @@ language ids exist and what they invoke. Editing it requires a
   (or set `JAVA_OPTS` for launcher scripts). Without this the JVM sees
   host nproc and spawns threadpools that hit `RLIMIT_NPROC` inside the
   sandbox → `pthread_create EAGAIN`.
+- **Kotlin compile (id 78)** carries explicit JVM heap caps via `-J`
+  flags on `kotlinc`:
+  ```
+  -J-Xmx384m -J-XX:MaxMetaspaceSize=80m -J-XX:ReservedCodeCacheSize=32m -J-XX:+UseSerialGC
+  ```
+  Reason: `IsolateJob#compile` hardcodes the compile cgroup's
+  `--cg-mem` to `Config::MAX_MEMORY_LIMIT` (NOT the per-submission
+  `memory_limit`), so the compile step is fixed at 500 MB on staging.
+  Default G1GC + uncapped metaspace pushes total JVM footprint past
+  500 MB even on hello-world and the cgroup OOM-killer SIGKILLs the
+  java subprocess. UseSerialGC is not optional — it's the difference
+  between a ~480 MB and a ~600 MB resident footprint.
 - **GCC id 50 (C) / 54 (C++)** are the only C/C++ toolchain entries in
   active.rb. Both point to `/usr/local/gcc-9.5.0/...`. The GCC 14 path
   (ids 3003/3004) was archived in 0.64 since production submissions

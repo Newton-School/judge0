@@ -24,7 +24,11 @@ set -u
 
 URL="${JUDGE0_URL:-http://localhost:2358}"
 EXPECTED="Hello, Newton!"
-ARCH="$(uname -m)"
+# Detect TARGET architecture (where submissions execute) via /system_info,
+# not the local machine — running this from an arm64 Mac against an amd64
+# server should not skip NASM/FreeBASIC.
+ARCH="$(curl -fsS "${URL}/system_info" 2>/dev/null | jq -r '.Architecture // empty')"
+ARCH="${ARCH:-$(uname -m)}"
 
 PASS=0
 FAIL=0
@@ -47,6 +51,22 @@ t() {
     local payload resp status stdout err
     payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" \
         '{language_id:$lid, source_code:$sc}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
+# t_mem <name> <language_id> <source_code> <memory_limit_kb> [<expected_substring>]
+# Same as t() but pins an explicit memory_limit on the submission. Used for
+# languages whose compile step needs more than the global default — Kotlin's
+# kotlinc bootstrap blows past 128 MB and gets OOM-killed by the cgroup
+# unless we ask for headroom.
+t_mem() {
+    local name="$1" lid="$2" src="$3" mem="$4"
+    local expected="${5:-$EXPECTED}"
+    local payload resp
+    payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" --argjson mem "$mem" \
+        '{language_id:$lid, source_code:$sc, memory_limit:$mem}')"
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
         -H 'Content-Type: application/json' -d "$payload")"
     _check_resp "$name" "$lid" "$expected" "$resp"

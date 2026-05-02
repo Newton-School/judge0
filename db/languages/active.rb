@@ -109,12 +109,20 @@
   # produces MainKt.class (Kotlin's top-level-fun-to-class mangling); the
   # `kotlin` wrapper script handles classpath setup including the stdlib
   # jar and execs java internally.
+  #
+  # Compile-step JVM tuning: kotlinc bootstrap with the default G1GC +
+  # uncapped metaspace blows past 500 MB on a hello-world compile and
+  # gets OOM-killed by isolate's compile cgroup (which is hardcoded to
+  # Config::MAX_MEMORY_LIMIT in app/jobs/isolate_job.rb, not the
+  # per-submission memory_limit). The -J flags below keep total JVM
+  # footprint under ~480 MB so it fits in the 500 MB cap. UseSerialGC is
+  # not optional — G1's native bookkeeping is what tips the balance.
   {
     id: 78,
     name: "Kotlin (2.3.21)",
     is_archived: false,
     source_file: "Main.kt",
-    compile_cmd: "/usr/local/kotlin-2.3.21/bin/kotlinc %s Main.kt",
+    compile_cmd: "/usr/local/kotlin-2.3.21/bin/kotlinc -J-Xmx384m -J-XX:MaxMetaspaceSize=80m -J-XX:ReservedCodeCacheSize=32m -J-XX:+UseSerialGC %s Main.kt",
     run_cmd: "/usr/local/kotlin-2.3.21/bin/kotlin MainKt"
   },
   {
