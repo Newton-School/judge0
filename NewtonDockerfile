@@ -74,6 +74,17 @@ RUN set -xe && \
 ENV PATH "/usr/local/ruby-${APP_RUBY_VERSION}/bin:/opt/.gem/bin:$PATH"
 ENV GEM_HOME "/opt/.gem/"
 
+# OpenSSL 1.1.1w above is built with --openssldir=/usr/local/openssl-1.1.1w
+# and `make install_sw`, which does NOT install a CA bundle — that
+# directory ends up with no cert.pem and an empty certs/. Ruby 2.7's
+# openssl extension is linked against this OpenSSL, so its compiled-in
+# DEFAULT_CERT_FILE / DEFAULT_CERT_DIR resolve to that empty prefix and
+# every outbound HTTPS call fails with "unable to get local issuer
+# certificate". Point Ruby at Bookworm's system bundle (installed by
+# the ca-certificates package in the compilers base image) instead.
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_DIR=/etc/ssl/certs
+
 # Step 4: bundler + aglio (now Ruby is in PATH)
 RUN echo "gem: --no-document" > /root/.gemrc && \
     gem install bundler:2.1.4 && \
