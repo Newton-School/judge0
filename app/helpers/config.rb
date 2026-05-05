@@ -31,6 +31,7 @@ module Config
   ALLOW_ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT = ENV["ALLOW_ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT"] != "false"
   MAX_FILE_SIZE = (ENV["MAX_FILE_SIZE"].presence || 1024).to_i
   MAX_MAX_FILE_SIZE = (ENV["MAX_MAX_FILE_SIZE"].presence || 4096).to_i
+  MAX_MAX_ASSET_SIZE = (ENV["MAX_MAX_ASSET_SIZE"].presence || 20480).to_i
   MAX_OPEN_FILES = (ENV["MAX_OPEN_FILES"].presence || 4096).to_i
   MAX_MAX_OPEN_FILES = (ENV["MAX_MAX_OPEN_FILES"].presence || 16384).to_i
   NUMBER_OF_RUNS = (ENV["NUMBER_OF_RUNS"].presence || 1).to_i
@@ -77,6 +78,7 @@ module Config
       "allow_enable_per_process_and_thread_memory_limit": ALLOW_ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT,
       "max_file_size": MAX_FILE_SIZE,
       "max_max_file_size": MAX_MAX_FILE_SIZE,
+      "max_max_asset_size": MAX_MAX_ASSET_SIZE,
       "max_open_files": MAX_OPEN_FILES,
       "max_max_open_files": MAX_MAX_OPEN_FILES,
       "number_of_runs": NUMBER_OF_RUNS,
