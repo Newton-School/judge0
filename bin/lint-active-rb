@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+# bin/lint-active-rb — schema check for db/languages/active.rb
+#
+# Usage:
+#   bundle exec ruby bin/lint-active-rb
+#   ./bin/lint-active-rb                    # if executable
+#
+# Intended to run in CI before `docker push` so malformed asset
+# declarations are caught at PR time, not at container boot. The same
+# AssetValidator logic also runs in db/seeds.rb (Layer 1, runtime
+# safety) — this script is the Layer 2 / pre-merge gate.
+#
+# Per docs/superpowers/specs/2026-05-05-submission-assets-design.md.
+
+require_relative "../db/languages/active"
+require_relative "../db/languages/asset_validator"
+
+errors = @languages.flat_map { |lang| AssetValidator.validate_language(lang) }
+
+if errors.empty?
+  decl_count = @languages.sum { |l| Array(l[:assets]).size }
+  puts "OK — #{@languages.count} languages, #{decl_count} asset declarations validated."
+  exit 0
+else
+  warn "active.rb has #{errors.size} problem(s):"
+  errors.each { |e| warn "  - #{e}" }
+  exit 1
+end
