@@ -179,7 +179,8 @@ class SubmissionsController < ApplicationController
       :callback_url,
       :additional_files,
       :enable_network,
-      :playground_hash
+      :playground_hash,
+      :skip_assets
     )
 
     submission_params[:additional_files] = Base64Service.decode(submission_params[:additional_files])
