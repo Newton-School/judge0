@@ -437,7 +437,7 @@ t_stdin "Verilog 3005 self-contained / empty stdin" 3005 "$SRC_VERILOG_SELF" "" 
 # $dumpfile + $dumpvars; we expect a wave.vcd asset to be captured and
 # surfaced via /submissions/:token/assets/wave.vcd. Adds two PASS
 # entries to the smoke summary (stdout grading + asset check).
-t_stdin_with_asset "Verilog 3005 with wave.vcd asset" 3005 \
+t_stdin_with_asset "Verilog 3005 with wave.vcd" 3005 \
     "$SRC_VERILOG_WAVE" "$STDIN_VERILOG_WAVE" "$EXPECTED" "wave.vcd"
 
 # Archived languages are intentionally not tested here — the smoke test
