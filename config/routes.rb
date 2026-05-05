@@ -4,6 +4,15 @@ Rails.application.routes.draw do
   resources :submissions, only: [:index, :show, :create, :destroy], param: :token do
     post 'batch', to: 'submissions#batch_create', on: :collection
     get 'batch', to: 'submissions#batch_show', on: :collection
+
+    # Phase 3 — asset bytes endpoint. logical_name regex allows dots
+    # in filenames (e.g. 'wave.vcd') without Rails treating them as
+    # format separators.
+    # See docs/superpowers/specs/2026-05-05-submission-assets-design.md.
+    get 'assets/:logical_name',
+        to: 'submission_assets#show',
+        constraints: { logical_name: %r{[^/]+} },
+        as: :asset
   end
 
   resources :languages, only: [:index, :show] do
