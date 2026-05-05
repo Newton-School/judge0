@@ -1,5 +1,13 @@
 require_relative 'languages/archived'
 require_relative 'languages/active'
+require_relative 'languages/asset_validator'
+
+# Phase 3 schema check — fail-fast on malformed `assets:` declarations.
+# Per docs/superpowers/specs/2026-05-05-submission-assets-design.md.
+asset_errors = @languages.flat_map { |lang| AssetValidator.validate_language(lang) }
+if asset_errors.any?
+  raise "active.rb asset validation failed:\n  " + asset_errors.join("\n  ")
+end
 
 ActiveRecord::Base.transaction do
   Language.unscoped.delete_all
