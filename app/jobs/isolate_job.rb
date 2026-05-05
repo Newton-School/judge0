@@ -36,6 +36,7 @@ class IsolateJob < ApplicationJob
       time << submission.time
       memory << submission.memory
 
+      capture_assets
       cleanup
       break if submission.status != Status.ac
     end
@@ -305,6 +306,26 @@ class IsolateJob < ApplicationJob
     end
     `isolate #{cgroups} -b #{box_id} --cleanup`
     raise "Cleanup of sandbox #{box_id} failed." if raise_exception && Dir.exists?(workdir)
+  end
+
+  # Phase 3 — capture language-declared artifacts (e.g. Verilog .vcd
+  # waveforms) from the box before cleanup wipes it. Two-level decision:
+  #   1. caller opt-out via submission.skip_assets
+  #   2. language opt-in via non-empty assets: array in active.rb
+  # Per docs/superpowers/specs/2026-05-05-submission-assets-design.md.
+  def capture_assets
+    return if submission.skip_assets
+    return if submission.language.assets.blank?
+
+    AssetCapture.new(
+      box_path:     boxdir,
+      submission:   submission,
+      declarations: submission.language.assets
+    ).call
+  rescue StandardError => e
+    # Capture failure must not break grading. Log and proceed; cleanup
+    # runs regardless via the caller's && chain.
+    Rails.logger.error("AssetCapture failed for submission #{submission.id}: #{e.class} #{e.message}")
   end
 
   def reset_metadata_file
