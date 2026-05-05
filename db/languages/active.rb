@@ -203,6 +203,15 @@
     is_archived: false,
     source_file: "main.v",
     compile_cmd: "/usr/local/iverilog-13.0/bin/iverilog -g2012 -tnull %s main.v",
-    run_cmd: "/bin/cat > tb.v && /usr/local/iverilog-13.0/bin/iverilog -g2012 -o sim.vvp main.v tb.v && /usr/local/iverilog-13.0/bin/vvp sim.vvp"
+    run_cmd: "/bin/cat > tb.v && /usr/local/iverilog-13.0/bin/iverilog -g2012 -o sim.vvp main.v tb.v && /usr/local/iverilog-13.0/bin/vvp sim.vvp",
+    # Phase 3 asset: capture .vcd waveforms produced by testbenches that
+    # call $dumpfile/$dumpvars. Author opt-in is implicit (testbench
+    # without $dumpfile produces no .vcd, regex matches nothing, no row).
+    # 20 KB cap targets DSA-scale designs; authors needing larger dumps
+    # must scope their $dumpvars (e.g. $dumpvars(1, testbench.dut)).
+    # See docs/superpowers/specs/2026-05-05-submission-assets-design.md.
+    assets: [
+      { name: "wave.vcd", identification: '\.vcd$', max_size: 20480 }
+    ]
   }
 ]

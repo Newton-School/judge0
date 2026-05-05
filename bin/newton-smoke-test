@@ -85,6 +85,54 @@ t_stdin() {
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
+# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name>
+# Phase 3 — same as t_stdin, but also asserts the named asset is captured:
+#   1. submission GET (with fields=...,assets) returns metadata with size_bytes>0 and error=null
+#   2. dedicated bytes endpoint returns HTTP 200
+# Adds an additional PASS/FAIL row beyond the stdout grading check, so a
+# Verilog problem with $dumpfile contributes 2 entries to the smoke summary.
+t_stdin_with_asset() {
+    local name="$1" lid="$2" src="$3" stdin="$4" expected="$5" asset_name="$6"
+    local payload resp token assets_json size err bytes_status
+
+    payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
+        '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=token,stdout,stderr,status,message,compile_output,assets" \
+        -H 'Content-Type: application/json' -d "$payload")"
+
+    token="$(echo "$resp" | jq -r '.token // empty')"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+
+    if [[ -z "$token" ]]; then
+        printf "  \033[31mFAIL\033[0m  %s asset (no token returned)\n" "$name"
+        FAIL=$((FAIL+1))
+        FAILED+=("$name asset (no token)")
+        return
+    fi
+
+    assets_json="$(echo "$resp" | jq -c --arg n "$asset_name" '.assets // [] | map(select(.logical_name == $n)) | .[0] // {}')"
+    size="$(echo "$assets_json" | jq -r '.size_bytes // 0')"
+    err="$(echo "$assets_json" | jq -r '.error // empty')"
+
+    if [[ -n "$err" || "$size" -le 0 ]]; then
+        printf "  \033[31mFAIL\033[0m  %s asset metadata  size=%s err=%s\n" "$name" "$size" "$err"
+        FAIL=$((FAIL+1))
+        FAILED+=("$name asset metadata (size=$size err=$err)")
+        return
+    fi
+
+    bytes_status="$(curl -s -o /dev/null -w '%{http_code}' "${URL}/submissions/$token/assets/$asset_name")"
+    if [[ "$bytes_status" != "200" ]]; then
+        printf "  \033[31mFAIL\033[0m  %s asset bytes endpoint http=%s\n" "$name" "$bytes_status"
+        FAIL=$((FAIL+1))
+        FAILED+=("$name asset bytes (http $bytes_status)")
+        return
+    fi
+
+    printf "  \033[32mPASS\033[0m  %s asset (size=%s)\n" "$name" "$size"
+    PASS=$((PASS+1))
+}
+
 _check_resp() {
     local name="$1" lid="$2" expected="$3" resp="$4"
     local status stdout err
@@ -267,6 +315,31 @@ SRC_VERILOG_SELF='module testbench;
   end
 endmodule'
 
+# Verilog 3005 — variant with $dumpfile/$dumpvars that drives Phase 3
+# asset capture. AND-gate DUT + testbench that produces wave.vcd
+# alongside the truth table on stdout. The smoke driver
+# (t_stdin_with_asset) verifies both the stdout grading AND that the
+# wave.vcd asset shows up via /submissions/:token/assets/wave.vcd.
+SRC_VERILOG_WAVE='module and_gate(input wire a, input wire b, output wire y);
+  assign y = a & b;
+endmodule'
+
+STDIN_VERILOG_WAVE='`timescale 1ns/1ps
+module and_gate_tb;
+  reg a; reg b; wire y;
+  and_gate uut (.a(a), .b(b), .y(y));
+  initial begin
+    $dumpfile("wave.vcd");
+    $dumpvars(0, and_gate_tb);
+    a = 0; b = 0; #10;
+    a = 0; b = 1; #10;
+    a = 1; b = 0; #10;
+    a = 1; b = 1; #10;
+    $display("Hello, Newton!");
+    $finish(0);
+  end
+endmodule'
+
 # ────────────────────────────────────────────────────────────────────────
 # 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
 # dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
@@ -359,6 +432,13 @@ t_stdin "Verilog Icarus 13.0 (3005)" 3005 "$SRC_VERILOG" "$STDIN_VERILOG" "$EXPE
 # DUT's own testbench module. Confirms run_cmd is robust to missing
 # testbench, which can happen if the platform UI doesn't populate stdin.
 t_stdin "Verilog 3005 self-contained / empty stdin" 3005 "$SRC_VERILOG_SELF" "" "$EXPECTED"
+
+# Verilog with waveform (Phase 3 asset capture). Testbench includes
+# $dumpfile + $dumpvars; we expect a wave.vcd asset to be captured and
+# surfaced via /submissions/:token/assets/wave.vcd. Adds two PASS
+# entries to the smoke summary (stdout grading + asset check).
+t_stdin_with_asset "Verilog 3005 with wave.vcd" 3005 \
+    "$SRC_VERILOG_WAVE" "$STDIN_VERILOG_WAVE" "$EXPECTED" "wave.vcd"
 
 # Archived languages are intentionally not tested here — the smoke test
 # verifies the *currently active* surface. See db/languages/archived.rb

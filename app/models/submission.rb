@@ -78,6 +78,8 @@ class Submission < ApplicationRecord
   before_create :generate_token
   before_validation :set_defaults
 
+  has_many :submission_assets, dependent: :destroy
+
   enumeration :status
 
   default_scope { order(created_at: :desc) }

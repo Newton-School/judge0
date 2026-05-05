@@ -1,5 +1,5 @@
 class SubmissionSerializer < ActiveModel::Serializer
-  attributes((Submission.column_names + ["status", "language"] - ["id"]).collect(&:to_sym))
+  attributes((Submission.column_names + ["status", "language", "assets"] - ["id"]).collect(&:to_sym))
 
   def self.default_fields
     @@default_fields ||= [
@@ -51,6 +51,14 @@ class SubmissionSerializer < ActiveModel::Serializer
 
   def language
     ActiveModelSerializers::SerializableResource.new(object.language, { serializer: LanguageSerializer, fields: [:id, :name] })
+  end
+
+  # Phase 3 — array of asset metadata hashes (no `data`). Bytes are
+  # available via GET /submissions/:token/assets/:logical_name.
+  def assets
+    object.submission_assets.map do |a|
+      SubmissionAssetSerializer.new(a).attributes
+    end
   end
 
   def additional_files
