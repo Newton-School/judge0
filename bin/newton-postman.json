@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "f3a8c2e1-9d4b-4b6f-a7e2-5c1d8e9f0a01",
-    "name": "Newton Judge0 — All Languages (0.66)",
+    "name": "Newton Judge0 — All Languages (0.67)",
     "description": "End-to-end smoke for every active language id in db/languages/active.rb.\nMirrors bin/newton-smoke-test as importable Postman requests.\n\nUsage:\n  1. Import this file in Postman.\n  2. Edit the collection variable `base_url` to point at your environment\n     (e.g. http://localhost:2358 for dev, https://judge0.newtonschool.co for prod).\n  3. Run individual requests, or use the Collection Runner to execute all.\n\nAll requests use `?wait=true` so the response is the final submission result\n(no polling loop). Each request has a Tests script that asserts:\n  - HTTP 201\n  - status.description === \"Accepted\"\n  - stdout contains \"Hello, Newton!\"\n\nOnly currently-active languages are tested here. See db/languages/archived.rb\nfor retired ids — submitting any of those returns a 422 'language is archived'.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
