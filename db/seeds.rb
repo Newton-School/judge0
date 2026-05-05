@@ -19,6 +19,7 @@ ActiveRecord::Base.transaction do
       source_file: language[:source_file],
       compile_cmd: language[:compile_cmd],
       run_cmd: language[:run_cmd],
+      assets: language[:assets],
     )
   end
 end
