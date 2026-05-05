@@ -174,8 +174,9 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 
 Submits a hello-world for every active language id. Expected (post-0.67
 with Phase 3 asset capture; three Verilog cases — testbench-in-stdin,
-empty-stdin self-contained, and wave.vcd asset):
-**24 PASS / 0 FAIL / 0 SKIP** on amd64; **22 PASS / 0 FAIL / 2 SKIP** on
+empty-stdin self-contained, and wave.vcd which produces both a
+stdout-grading PASS and a separate asset-metadata PASS):
+**25 PASS / 0 FAIL / 0 SKIP** on amd64; **23 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
@@ -243,11 +244,16 @@ in `judge0.conf` explain each. Summary:
 - Docker Hub: `newtonschool/newton-judge0`
 - Current tag: **`0.67`** — adds Phase 3 submission-assets capture
   (Verilog 3005 declares `wave.vcd`; framework is language-agnostic).
-  Smoke target 24/0/0 on amd64.
-- Production runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
-  pre-modernisation. Deploys are **single-image** (no docker-compose); the deployed
-  `newton-judge0:<tag>` connects to managed Postgres + managed Redis from the environment.
-- **Before bumping prod to 0.67:** prod nodes still run Amazon Linux 2 (cgroup v1).
-  Flip the karpenter NodeClass to AL2023 first — otherwise `docker-entrypoint.sh`'s
-  cgroup-v2 setup falls back silently to rlimit mode and you lose RSS-based limits.
+  Smoke target 25/0/0 on amd64.
+- Production runs `newton-judge0:0.67` from ECR
+  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-05.
+  Smoke green against `https://judge0-public.newtonschool.co` (25/0/0 incl.
+  Phase 3 wave.vcd asset round-trip). Deploys are **single-image** (no
+  docker-compose); the deployed `newton-judge0:<tag>` connects to managed
+  Postgres + managed Redis from the environment.
+- **AL2 → AL2023 NodeClass flip is done.** The karpenter `code-compiler`
+  NodeClass moved to `amiFamily: AL2023` ahead of the 0.67 deploy, so
+  `docker-entrypoint.sh`'s cgroup-v2 setup is active in prod and the
+  RSS-based memory / `cpu.stat`-based time semantics work as designed.
+  Future image bumps inherit this — no per-bump prerequisite.
 - See `git log` for the 0.53 → 0.67 chronology if you need to bisect a regression.
