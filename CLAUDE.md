@@ -111,6 +111,19 @@ language ids exist and what they invoke. Editing it requires a
   `tb.v:N: $finish called at T (1s)` epilogue (or use `$finish(0);` in
   the testbench to suppress that line at source). Full design rationale
   in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
+- **Submission assets (Phase 3, new in 0.67).** Languages may declare
+  an `assets:` array in `active.rb` (Verilog 3005 declares `wave.vcd`
+  with regex `\.vcd$`). After `run_cmd` exits, `IsolateJob` calls
+  `AssetCapture` to glob the box for matching files and persist them
+  as `submission_assets` rows (base64 in a `text` column, capped per
+  declaration / `MAX_MAX_ASSET_SIZE`). Two-level decision: per-call
+  opt-out via `skip_assets: true` in the POST body, plus implicit
+  per-language opt-in (no `assets:` array → no capture work).
+  Validation runs at seed time (fails container boot on bad regex)
+  and via `bin/lint-active-rb` (CI gate). API: extended submission
+  GET returns asset metadata when `fields=...,assets`; bytes via
+  `GET /submissions/:token/assets/:logical_name`. Full design in
+  `docs/superpowers/specs/2026-05-05-submission-assets-design.md`.
 
 ## Build commands
 
@@ -159,10 +172,11 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Expected (post-0.66
-with Verilog added; two cases — testbench-in-stdin and empty-stdin
-self-contained): **23 PASS / 0 FAIL / 0 SKIP** on amd64; **21 PASS /
-0 FAIL / 2 SKIP** on arm64 (NASM and FreeBASIC are amd64-only upstream).
+Submits a hello-world for every active language id. Expected (post-0.67
+with Phase 3 asset capture; three Verilog cases — testbench-in-stdin,
+empty-stdin self-contained, and wave.vcd asset):
+**24 PASS / 0 FAIL / 0 SKIP** on amd64; **22 PASS / 0 FAIL / 2 SKIP** on
+arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
@@ -183,6 +197,7 @@ in `judge0.conf` explain each. Summary:
 | `MAX_MAX_PROCESSES_AND_OR_THREADS` | 120 | **4096** | compile-time max |
 | `MAX_FILE_SIZE` | 1 MB | **1 GiB** | Go 1.23 binaries + Java class+jar bundles can exceed 1 MB |
 | `MAX_MAX_FILE_SIZE` | 4 MB | **2 GiB** | per-submission max |
+| `MAX_MAX_ASSET_SIZE` | – (new in 0.67) | **20480** (20 KB) | Phase 3 asset cap; clamps any per-language `max_size` |
 
 ## Common pitfalls
 
@@ -226,12 +241,13 @@ in `judge0.conf` explain each. Summary:
 ## Image is published as
 
 - Docker Hub: `newtonschool/newton-judge0`
-- Current tag: **`0.66`** — compiler base 0.29 (adds Icarus Verilog 13.0
-  for new language id 3005). Smoke target 22/0/0 on amd64.
+- Current tag: **`0.67`** — adds Phase 3 submission-assets capture
+  (Verilog 3005 declares `wave.vcd`; framework is language-agnostic).
+  Smoke target 24/0/0 on amd64.
 - Production runs from ECR (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:0.56`),
   pre-modernisation. Deploys are **single-image** (no docker-compose); the deployed
   `newton-judge0:<tag>` connects to managed Postgres + managed Redis from the environment.
-- **Before bumping prod to 0.66:** prod nodes still run Amazon Linux 2 (cgroup v1).
+- **Before bumping prod to 0.67:** prod nodes still run Amazon Linux 2 (cgroup v1).
   Flip the karpenter NodeClass to AL2023 first — otherwise `docker-entrypoint.sh`'s
   cgroup-v2 setup falls back silently to rlimit mode and you lose RSS-based limits.
-- See `git log` for the 0.53 → 0.66 chronology if you need to bisect a regression.
+- See `git log` for the 0.53 → 0.67 chronology if you need to bisect a regression.
