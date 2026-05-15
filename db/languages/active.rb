@@ -213,5 +213,32 @@
     assets: [
       { name: "wave.vcd", identification: '\.vcd$', max_size: 20480 }
     ]
+  },
+  # C# lanes restored on top of the cgroup-v2-capable compiler image.
+  # We keep them as new ids instead of reusing historical ids because
+  # those old ids were repurposed/archived during earlier trim cycles.
+  {
+    id: 3006,
+    name: "C# (Mono 6.12.0.206)",
+    is_archived: false,
+    source_file: "Main.cs",
+    compile_cmd: "/usr/local/mono-6.12.0.206/bin/mcs %s Main.cs",
+    run_cmd: "/usr/local/mono-6.12.0.206/bin/mono Main.exe"
+  },
+  {
+    id: 3007,
+    name: "C# (.NET 8.0.419)",
+    is_archived: false,
+    source_file: "Main.cs",
+    compile_cmd: "mkdir -p .dotnet-home out && printf '%s\\n' '{ \"sdk\": { \"version\": \"8.0.419\", \"rollForward\": \"disable\" } }' > global.json && printf '%s\\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '    <ImplicitUsings>disable</ImplicitUsings>' '    <Nullable>disable</Nullable>' '    <UseAppHost>false</UseAppHost>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=$(pwd)/.dotnet-home /usr/local/dotnet-sdk/dotnet build Main.csproj --framework net8.0 -nologo -o out %s",
+    run_cmd: "DOTNET_CLI_HOME=$(pwd)/.dotnet-home /usr/local/dotnet-sdk/dotnet ./out/Main.dll"
+  },
+  {
+    id: 3008,
+    name: "C# (.NET 10.0.106)",
+    is_archived: false,
+    source_file: "Main.cs",
+    compile_cmd: "mkdir -p .dotnet-home out && printf '%s\\n' '{ \"sdk\": { \"version\": \"10.0.106\", \"rollForward\": \"disable\" } }' > global.json && printf '%s\\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net10.0</TargetFramework>' '    <ImplicitUsings>disable</ImplicitUsings>' '    <Nullable>disable</Nullable>' '    <UseAppHost>false</UseAppHost>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=$(pwd)/.dotnet-home /usr/local/dotnet-sdk/dotnet build Main.csproj --framework net10.0 -nologo -o out %s",
+    run_cmd: "DOTNET_CLI_HOME=$(pwd)/.dotnet-home /usr/local/dotnet-sdk/dotnet ./out/Main.dll"
   }
 ]
