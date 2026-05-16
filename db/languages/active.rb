@@ -230,7 +230,7 @@
     name: "C# (.NET 8.0.420)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "REF_DIR=$(echo /usr/local/dotnet-sdk/packs/Microsoft.NETCore.App.Ref/8.0.*/ref/net8.0) && RUNTIME_VERSION=$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App 8\\./ {print $2; exit}') && printf '%%s\\n' '{ \"runtimeOptions\": { \"tfm\": \"net8.0\", \"framework\": { \"name\": \"Microsoft.NETCore.App\", \"version\": \"'\"$RUNTIME_VERSION\"'\" } } }' > Main.runtimeconfig.json && REFS=$(printf -- '-r:%%s ' \"$REF_DIR\"/*.dll) && DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet /usr/local/dotnet-sdk/sdk/8.0.420/Roslyn/bincore/csc.dll -nologo -target:exe -out:Main.dll %s $REFS Main.cs",
+    compile_cmd: "REF_DIR=$(echo /usr/local/dotnet-sdk/packs/Microsoft.NETCore.App.Ref/8.0.*/ref/net8.0) && RUNTIME_VERSION=$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App 8\\./ {print $2; exit}') && printf '%%s\\n' '{ \"runtimeOptions\": { \"tfm\": \"net8.0\", \"framework\": { \"name\": \"Microsoft.NETCore.App\", \"version\": \"'\"$RUNTIME_VERSION\"'\" } } }' > Main.runtimeconfig.json && REFS=$(printf -- '-r:%%s ' \"$REF_DIR\"/*.dll) && DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet /usr/local/dotnet-sdk/sdk/10.0.202/Roslyn/bincore/csc.dll -nologo -target:exe -out:Main.dll %s $REFS Main.cs",
     run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet exec --runtimeconfig Main.runtimeconfig.json Main.dll"
   },
   {
