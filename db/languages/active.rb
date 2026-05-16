@@ -231,7 +231,9 @@
     is_archived: false,
     source_file: "Main.cs",
     compile_cmd: "printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
-    run_cmd: "dotnet run --no-build --project Main.csproj --"
+    # Run the built DLL directly to avoid dotnet CLI/project resolution
+    # behavior inside isolate after the compile step has already succeeded.
+    run_cmd: "dotnet ./bin/Debug/net7.0/Main.dll"
   },
   {
     id: 3008,
@@ -239,6 +241,6 @@
     is_archived: false,
     source_file: "Main.cs",
     compile_cmd: "printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
-    run_cmd: "dotnet run --no-build --project Main.csproj --"
+    run_cmd: "dotnet ./bin/Debug/net8.0/Main.dll"
   }
 ]
