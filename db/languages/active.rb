@@ -230,7 +230,7 @@
     name: "C# (.NET Core SDK 7.0.400)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "cp /api/files/c#-dotnet-7/* . && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
+    compile_cmd: "printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
     run_cmd: "dotnet run --no-build --project Main.csproj --"
   },
   {
@@ -238,7 +238,7 @@
     name: "C# (.NET Core SDK 8.0.302)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "cp /api/files/c#-dotnet-8/* . && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
+    compile_cmd: "printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
     run_cmd: "dotnet run --no-build --project Main.csproj --"
   }
 ]
