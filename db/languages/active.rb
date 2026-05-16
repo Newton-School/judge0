@@ -230,7 +230,7 @@
     name: "C# (.NET Core SDK 7.0.400)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "cp /files/c#-dotnet-7/* . && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
+    compile_cmd: "cp /api/files/c#-dotnet-7/* . && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
     run_cmd: "dotnet run --no-build --project Main.csproj --"
   },
   {
@@ -238,7 +238,7 @@
     name: "C# (.NET Core SDK 8.0.302)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "cp /files/c#-dotnet-8/* . && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
+    compile_cmd: "cp /api/files/c#-dotnet-8/* . && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && dotnet build %s Main.csproj",
     run_cmd: "dotnet run --no-build --project Main.csproj --"
   }
 ]
