@@ -56,6 +56,17 @@ t() {
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
+t_opts() {
+    local name="$1" lid="$2" src="$3" opts="$4"
+    local expected="${5:-$EXPECTED}"
+    local payload resp
+    payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" --argjson opts "$opts" \
+        '$opts + {language_id:$lid, source_code:$sc}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    _check_resp "$name" "$lid" "$expected" "$resp"
+}
+
 # t_mem <name> <language_id> <source_code> <memory_limit_kb> [<expected_substring>]
 # Same as t() but pins an explicit memory_limit on the submission. Used for
 # languages whose compile step needs more than the global default — Kotlin's
@@ -182,6 +193,13 @@ SRC_JAVA='public class Main {
 SRC_KOTLIN='fun main() { println("Hello, Newton!") }'
 
 SRC_SCALA='object Main { def main(args: Array[String]): Unit = println("Hello, Newton!") }'
+
+SRC_CSHARP='using System;
+class Program {
+    static void Main() {
+        Console.WriteLine("Hello, Newton!");
+    }
+}'
 
 # Plain text — submission body is dumped verbatim by /bin/cat.
 SRC_PLAIN_TEXT='Hello, Newton!'
@@ -373,6 +391,15 @@ section "JVM"
 t "Java OpenJDK 21 (62)"        62   "$SRC_JAVA"
 t "Kotlin 2.3.21 (78)"          78   "$SRC_KOTLIN"
 t "Scala 3.8.3 (81)"            81   "$SRC_SCALA"
+
+# ────────────────────────────────────────────────────────────────────────
+section "C# / .NET"
+# Modern .NET needs max_file_size=0 when talking to Judge0 directly:
+# isolate's file-size rlimit trips SIGXFSZ during runtime startup even
+# when the configured cap is already very large.
+t "C# Mono 6.12.0.122 (3006)"   3006 "$SRC_CSHARP"
+t_opts "C# .NET 8.0.420 (3007)" 3007 "$SRC_CSHARP" '{"max_file_size":0}'
+t_opts "C# .NET 10.0.202 (3008)" 3008 "$SRC_CSHARP" '{"max_file_size":0}'
 
 # ────────────────────────────────────────────────────────────────────────
 section "Compiled"
