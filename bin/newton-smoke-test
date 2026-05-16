@@ -398,7 +398,6 @@ section "C# / .NET"
 # isolate's file-size rlimit trips SIGXFSZ during runtime startup even
 # when the configured cap is already very large.
 t "C# Mono 6.12.0.122 (3006)"   3006 "$SRC_CSHARP"
-t_opts "C# .NET 8.0.420 (3007)" 3007 "$SRC_CSHARP" '{"max_file_size":0}'
 t_opts "C# .NET 10.0.202 (3008)" 3008 "$SRC_CSHARP" '{"max_file_size":0}'
 
 # ────────────────────────────────────────────────────────────────────────
