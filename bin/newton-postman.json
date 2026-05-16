@@ -221,7 +221,7 @@
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
-            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3008,\n  \"max_file_size\": 0,\n  \"source_code\": \"using System;\\nclass Program {\\n    static void Main() {\\n        Console.WriteLine(\\\"Hello, Newton!\\\");\\n    }\\n}\"\n}"}
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3008,\n  \"source_code\": \"using System;\\nclass Program {\\n    static void Main() {\\n        Console.WriteLine(\\\"Hello, Newton!\\\");\\n    }\\n}\"\n}"}
           }
         }
       ]
