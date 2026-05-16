@@ -231,7 +231,7 @@
     is_archived: false,
     source_file: "Main.cs",
     compile_cmd: "REF_DIR=$(echo /usr/local/dotnet-sdk/packs/Microsoft.NETCore.App.Ref/8.0.*/ref/net8.0) && RUNTIME_VERSION=$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App 8\\./ {print $2; exit}') && printf '%%s\\n' '{ \"runtimeOptions\": { \"tfm\": \"net8.0\", \"framework\": { \"name\": \"Microsoft.NETCore.App\", \"version\": \"'\"$RUNTIME_VERSION\"'\" } } }' > Main.runtimeconfig.json && REFS=$(printf -- '-r:%%s ' \"$REF_DIR\"/*.dll) && DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet /usr/local/dotnet-sdk/sdk/10.0.202/Roslyn/bincore/csc.dll -nologo -target:exe -out:Main.dll %s $REFS Main.cs",
-    run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet exec --runtimeconfig Main.runtimeconfig.json Main.dll"
+    run_cmd: "mkdir -p .dotnet-home/.nuget/packages .dotnet-home/.dotnet && HOME=$(pwd)/.dotnet-home DOTNET_CLI_HOME=$(pwd)/.dotnet-home DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_GENERATE_ASPNET_CERTIFICATE=false DOTNET_ADD_GLOBAL_TOOLS_TO_PATH=false DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1 DOTNET_SKIP_WORKLOAD_INTEGRITY_CHECK=1 NUGET_PACKAGES=$(pwd)/.dotnet-home/.nuget/packages dotnet exec --runtimeconfig Main.runtimeconfig.json Main.dll"
   },
   {
     id: 3008,
@@ -239,6 +239,6 @@
     is_archived: false,
     source_file: "Main.cs",
     compile_cmd: "REF_DIR=$(echo /usr/local/dotnet-sdk/packs/Microsoft.NETCore.App.Ref/10.0.*/ref/net10.0) && RUNTIME_VERSION=$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App 10\\./ {print $2; exit}') && printf '%%s\\n' '{ \"runtimeOptions\": { \"tfm\": \"net10.0\", \"framework\": { \"name\": \"Microsoft.NETCore.App\", \"version\": \"'\"$RUNTIME_VERSION\"'\" } } }' > Main.runtimeconfig.json && REFS=$(printf -- '-r:%%s ' \"$REF_DIR\"/*.dll) && DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet /usr/local/dotnet-sdk/sdk/10.0.202/Roslyn/bincore/csc.dll -nologo -target:exe -out:Main.dll %s $REFS Main.cs",
-    run_cmd: "DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 dotnet exec --runtimeconfig Main.runtimeconfig.json Main.dll"
+    run_cmd: "mkdir -p .dotnet-home/.nuget/packages .dotnet-home/.dotnet && HOME=$(pwd)/.dotnet-home DOTNET_CLI_HOME=$(pwd)/.dotnet-home DOTNET_ROOT=/usr/local/dotnet-sdk DOTNET_MULTILEVEL_LOOKUP=0 DOTNET_NOLOGO=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_GENERATE_ASPNET_CERTIFICATE=false DOTNET_ADD_GLOBAL_TOOLS_TO_PATH=false DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1 DOTNET_SKIP_WORKLOAD_INTEGRITY_CHECK=1 NUGET_PACKAGES=$(pwd)/.dotnet-home/.nuget/packages dotnet exec --runtimeconfig Main.runtimeconfig.json Main.dll"
   }
 ]
