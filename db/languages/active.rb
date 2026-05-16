@@ -219,11 +219,11 @@
   # those old ids were repurposed/archived during earlier trim cycles.
   {
     id: 3006,
-    name: "C# (Mono 6.12.0.200)",
+    name: "C# (Mono 6.12.0.122)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "/usr/local/mono-6.12.0.200/bin/mcs %s Main.cs",
-    run_cmd: "/usr/local/mono-6.12.0.200/bin/mono Main.exe"
+    compile_cmd: "/usr/local/mono-6.12.0.122/bin/mcs %s Main.cs",
+    run_cmd: "/usr/local/mono-6.12.0.122/bin/mono Main.exe"
   },
   {
     id: 3007,
