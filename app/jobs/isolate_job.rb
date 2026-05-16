@@ -233,6 +233,12 @@ class IsolateJob < ApplicationJob
       File.open(run_script, "w") { |f| f.write("#{submission.language.run_cmd} #{command_line_arguments}")}
     end
 
+    # dotnet run for the modern C# lanes also writes enough runtime state
+    # to trip isolate's per-file write cap on tiny submissions. Mirror the
+    # compile-phase exception so the run phase uses no file-size cap for
+    # 3007/3008 while every other language keeps its normal limit.
+    run_max_file_size = MODERN_CSHARP_LANGUAGE_IDS.include?(submission.language.id) ? 0 : submission.max_file_size
+
     command = "isolate #{cgroups} \
     -s \
     -b #{box_id} \
@@ -246,7 +252,7 @@ class IsolateJob < ApplicationJob
     -p#{submission.max_processes_and_or_threads} \
     --open-files=#{Config::MAX_OPEN_FILES} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{submission.memory_limit} \
-    -f #{submission.max_file_size} \
+    -f #{run_max_file_size} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
