@@ -142,11 +142,11 @@ language ids exist and what they invoke. Editing it requires a
 ```bash
 # arm64 (Mac dev)
 docker buildx build --platform linux/arm64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.66 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.76 --load .
 
 # amd64 (EC2 / prod)
 docker buildx build --platform linux/amd64 \
-  -f NewtonDockerfile -t newtonschool/newton-judge0:0.66 --load .
+  -f NewtonDockerfile -t newtonschool/newton-judge0:0.76 --load .
 ```
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
@@ -184,11 +184,10 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Expected (post-0.67
-with Phase 3 asset capture; three Verilog cases — testbench-in-stdin,
-empty-stdin self-contained, and wave.vcd which produces both a
-stdout-grading PASS and a separate asset-metadata PASS):
-**25 PASS / 0 FAIL / 0 SKIP** on amd64; **23 PASS / 0 FAIL / 2 SKIP** on
+Submits a hello-world for every active language id. Expected (post-0.76
+with three C# lanes on compiler 0.33 — Mono 3006, .NET 7 3007,
+.NET 8 3008; plus the three Verilog cases from 0.67):
+**28 PASS / 0 FAIL / 0 SKIP** on amd64; **26 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
@@ -254,13 +253,17 @@ in `judge0.conf` explain each. Summary:
 ## Image is published as
 
 - Docker Hub: `newtonschool/newton-judge0`
-- Current tag: **`0.67`** — adds Phase 3 submission-assets capture
-  (Verilog 3005 declares `wave.vcd`; framework is language-agnostic).
-  Smoke target 25/0/0 on amd64.
-- Production runs `newton-judge0:0.67` from ECR
-  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-05.
-  Smoke green against `https://judge0-public.newtonschool.co` (25/0/0 incl.
-  Phase 3 wave.vcd asset round-trip). Deploys are **single-image** (no
+- Current tag: **`0.76`** — adds three C# lanes on compiler 0.33:
+  3006 Mono 6.12, 3007 .NET 7.0.400, 3008 .NET 8.0.302. Compiler base
+  bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
+  for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
+  `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
+  28/0/0 on amd64.
+- Production still runs `newton-judge0:0.67` from ECR
+  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-05;
+  update this line once 0.76 ships. Smoke green against
+  `https://judge0-public.newtonschool.co` (25/0/0 incl. Phase 3 wave.vcd
+  asset round-trip on 0.67). Deploys are **single-image** (no
   docker-compose); the deployed `newton-judge0:<tag>` connects to managed
   Postgres + managed Redis from the environment.
 - **AL2 → AL2023 NodeClass flip is done.** The karpenter `code-compiler`
