@@ -230,7 +230,7 @@
     name: "C# (.NET Core SDK 7.0.400)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
     run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
   },
   {
@@ -238,7 +238,7 @@
     name: "C# (.NET Core SDK 8.0.302)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
     run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
   },
   {
@@ -246,7 +246,7 @@
     name: "C# (.NET Core SDK 10.0.202)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"10.0.202\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net10.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"10.0.202\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net10.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/10.0.202.dotnetFirstUseSentinel && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
     run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
   }
 ]
