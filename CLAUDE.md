@@ -111,9 +111,9 @@ language ids exist and what they invoke. Editing it requires a
   `tb.v:N: $finish called at T (1s)` epilogue (or use `$finish(0);` in
   the testbench to suppress that line at source). Full design rationale
   in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
-- **C# .NET 7 / .NET 8 (ids 3007/3008).** dotnet on Linux uses a W^X
-  double-mapped JIT code allocator that calls `memfd_create` +
-  `ftruncate` to reserve a code cache sized from host RAM. On EC2 prod
+- **C# .NET 7 / .NET 8 / .NET 10 (ids 3007/3008/3009).** dotnet on Linux
+  uses a W^X double-mapped JIT code allocator that calls `memfd_create`
+  + `ftruncate` to reserve a code cache sized from host RAM. On EC2 prod
   that reservation exceeds isolate's `RLIMIT_FSIZE` and kills dotnet
   with SIGXFSZ during runtime init — before any user-visible output.
   Fix: `DOTNET_EnableWriteXorExecute=0` lives in the compiler image's
@@ -184,10 +184,10 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Expected (post-0.76
-with three C# lanes on compiler 0.33 — Mono 3006, .NET 7 3007,
-.NET 8 3008; plus the three Verilog cases from 0.67):
-**28 PASS / 0 FAIL / 0 SKIP** on amd64; **26 PASS / 0 FAIL / 2 SKIP** on
+Submits a hello-world for every active language id. Expected (branch state
+with four C# lanes — Mono 3006, .NET 7 3007, .NET 8 3008, .NET 10 3009;
+plus the three Verilog cases from 0.67):
+**29 PASS / 0 FAIL / 0 SKIP** on amd64; **27 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
