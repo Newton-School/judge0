@@ -259,11 +259,10 @@ in `judge0.conf` explain each. Summary:
   for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
   `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
   28/0/0 on amd64.
-- Production still runs `newton-judge0:0.67` from ECR
-  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-05;
-  update this line once 0.76 ships. Smoke green against
-  `https://judge0-public.newtonschool.co` (25/0/0 incl. Phase 3 wave.vcd
-  asset round-trip on 0.67). Deploys are **single-image** (no
+- Production runs `newton-judge0:0.76` from ECR
+  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-17.
+  Smoke green against `https://judge0-public.newtonschool.co`
+  (28/0/0 — three C# lanes on top of Phase 3). Deploys are **single-image** (no
   docker-compose); the deployed `newton-judge0:<tag>` connects to managed
   Postgres + managed Redis from the environment.
 - **AL2 → AL2023 NodeClass flip is done.** The karpenter `code-compiler`
