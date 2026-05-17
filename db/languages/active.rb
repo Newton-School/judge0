@@ -230,15 +230,22 @@
     name: "C# (.NET Core SDK 7.0.400)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
-    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
+    # DOTNET_EnableWriteXorExecute=0 disables .NET's W^X double-mapped JIT
+    # code allocator. That path calls memfd_create + ftruncate to a size
+    # derived from host RAM (multi-GB on prod EC2), which trips isolate's
+    # RLIMIT_FSIZE and kills dotnet before it produces any output. With W^X
+    # disabled, dotnet uses a single RWX mapping — fine inside isolate which
+    # already provides the security boundary.
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/7.0.400.dotnetFirstUseSentinel && DOTNET_EnableWriteXorExecute=0 DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    run_cmd: "DOTNET_EnableWriteXorExecute=0 DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
   },
   {
     id: 3008,
     name: "C# (.NET Core SDK 8.0.302)",
     is_archived: false,
     source_file: "Main.cs",
-    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
-    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
+    # See 3007 for DOTNET_EnableWriteXorExecute rationale.
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && mkdir -p ~/.dotnet && touch ~/.dotnet/8.0.302.dotnetFirstUseSentinel && DOTNET_EnableWriteXorExecute=0 DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    run_cmd: "DOTNET_EnableWriteXorExecute=0 DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
   }
 ]
