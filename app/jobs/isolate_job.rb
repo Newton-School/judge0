@@ -3,8 +3,6 @@ require 'open-uri'
 class IsolateJob < ApplicationJob
   retry_on RuntimeError, wait: 0.1.seconds, attempts: 100
 
-  MODERN_CSHARP_LANGUAGE_IDS = [3007, 3008].freeze
-
   queue_as ENV["JUDGE0_VERSION"].to_sym
 
   STDIN_FILE_NAME = "stdin.txt"
@@ -156,11 +154,6 @@ class IsolateJob < ApplicationJob
     compile_output_file = workdir + "/" + "compile_output.txt"
     initialize_file(compile_output_file)
 
-    # dotnet build for the modern C# lanes triggers SIGXFSZ under isolate's
-    # per-file write limit even for tiny hello-world submissions. Keep the
-    # compile-phase cap for every other language, but disable it for 3007/3008.
-    compile_max_file_size = MODERN_CSHARP_LANGUAGE_IDS.include?(submission.language.id) ? 0 : Config::MAX_MAX_FILE_SIZE
-
     command = "isolate #{cgroups} \
     -s \
     -b #{box_id} \
@@ -174,10 +167,11 @@ class IsolateJob < ApplicationJob
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
     --open-files=#{Config::MAX_MAX_OPEN_FILES} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{Config::MAX_MEMORY_LIMIT} \
-    -f #{compile_max_file_size} \
+    -f #{Config::MAX_MAX_FILE_SIZE} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
+    -E DOTNET_EnableWriteXorExecute \
     -d /etc:noexec \
     --run \
     -- /bin/bash compile > #{compile_output_file} \
@@ -233,12 +227,6 @@ class IsolateJob < ApplicationJob
       File.open(run_script, "w") { |f| f.write("#{submission.language.run_cmd} #{command_line_arguments}")}
     end
 
-    # dotnet run for the modern C# lanes also writes enough runtime state
-    # to trip isolate's per-file write cap on tiny submissions. Mirror the
-    # compile-phase exception so the run phase uses no file-size cap for
-    # 3007/3008 while every other language keeps its normal limit.
-    run_max_file_size = MODERN_CSHARP_LANGUAGE_IDS.include?(submission.language.id) ? 0 : submission.max_file_size
-
     command = "isolate #{cgroups} \
     -s \
     -b #{box_id} \
@@ -252,10 +240,11 @@ class IsolateJob < ApplicationJob
     -p#{submission.max_processes_and_or_threads} \
     --open-files=#{Config::MAX_OPEN_FILES} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{submission.memory_limit} \
-    -f #{run_max_file_size} \
+    -f #{submission.max_file_size} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
+    -E DOTNET_EnableWriteXorExecute \
     -d /etc:noexec \
     --run \
     -- /bin/bash run \

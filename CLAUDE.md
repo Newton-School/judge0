@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.29` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.33` | what we layer on |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -111,6 +111,18 @@ language ids exist and what they invoke. Editing it requires a
   `tb.v:N: $finish called at T (1s)` epilogue (or use `$finish(0);` in
   the testbench to suppress that line at source). Full design rationale
   in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
+- **C# .NET 7 / .NET 8 (ids 3007/3008).** dotnet on Linux uses a W^X
+  double-mapped JIT code allocator that calls `memfd_create` +
+  `ftruncate` to reserve a code cache sized from host RAM. On EC2 prod
+  that reservation exceeds isolate's `RLIMIT_FSIZE` and kills dotnet
+  with SIGXFSZ during runtime init — before any user-visible output.
+  Fix: `DOTNET_EnableWriteXorExecute=0` lives in the compiler image's
+  Tier 12 ENV (compiler 0.33+), and `IsolateJob` propagates it via
+  `-E DOTNET_EnableWriteXorExecute` on both compile and run commands.
+  Without the `-E` propagation it doesn't reach the sandbox (isolate
+  strips env by default). Diagnostic fingerprint when broken: compile
+  exits 153 (=128+25=SIGXFSZ) with empty stdout/stderr. Mono (3006)
+  uses a different runtime and doesn't need this.
 - **Submission assets (Phase 3, new in 0.67).** Languages may declare
   an `assets:` array in `active.rb` (Verilog 3005 declares `wave.vcd`
   with regex `\.vcd$`). After `run_cmd` exits, `IsolateJob` calls
