@@ -386,6 +386,7 @@ section "C# / .NET"
 t "C# Mono 6.12.0.122 (3006)"   3006 "$SRC_CSHARP"
 t "C# .NET Core 7.0.400 (3007)" 3007 "$SRC_CSHARP"
 t "C# .NET Core 8.0.302 (3008)" 3008 "$SRC_CSHARP"
+t "C# .NET Core 10.0.202 (3009)" 3009 "$SRC_CSHARP"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Compiled"

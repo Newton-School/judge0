@@ -3,7 +3,7 @@ require 'open-uri'
 class IsolateJob < ApplicationJob
   retry_on RuntimeError, wait: 0.1.seconds, attempts: 100
 
-  MODERN_CSHARP_LANGUAGE_IDS = [3007, 3008].freeze
+  MODERN_CSHARP_LANGUAGE_IDS = [3007, 3008, 3009].freeze
 
   queue_as ENV["JUDGE0_VERSION"].to_sym
 
@@ -158,7 +158,9 @@ class IsolateJob < ApplicationJob
 
     # dotnet build for the modern C# lanes triggers SIGXFSZ under isolate's
     # per-file write limit even for tiny hello-world submissions. Keep the
-    # compile-phase cap for every other language, but disable it for 3007/3008.
+    # compile-phase cap for every other language, but disable it for the
+    # modern project-based C# lanes where dotnet build writes enough SDK
+    # state to trip isolate's per-file limit on tiny submissions.
     compile_max_file_size = MODERN_CSHARP_LANGUAGE_IDS.include?(submission.language.id) ? 0 : Config::MAX_MAX_FILE_SIZE
 
     command = "isolate #{cgroups} \
@@ -236,7 +238,7 @@ class IsolateJob < ApplicationJob
     # dotnet run for the modern C# lanes also writes enough runtime state
     # to trip isolate's per-file write cap on tiny submissions. Mirror the
     # compile-phase exception so the run phase uses no file-size cap for
-    # 3007/3008 while every other language keeps its normal limit.
+    # 3007/3008/3009 while every other language keeps its normal limit.
     run_max_file_size = MODERN_CSHARP_LANGUAGE_IDS.include?(submission.language.id) ? 0 : submission.max_file_size
 
     command = "isolate #{cgroups} \
