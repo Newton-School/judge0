@@ -183,6 +183,13 @@ SRC_KOTLIN='fun main() { println("Hello, Newton!") }'
 
 SRC_SCALA='object Main { def main(args: Array[String]): Unit = println("Hello, Newton!") }'
 
+SRC_CSHARP='using System;
+class Program {
+    static void Main() {
+        Console.WriteLine("Hello, Newton!");
+    }
+}'
+
 # Plain text — submission body is dumped verbatim by /bin/cat.
 SRC_PLAIN_TEXT='Hello, Newton!'
 
@@ -373,6 +380,12 @@ section "JVM"
 t "Java OpenJDK 21 (62)"        62   "$SRC_JAVA"
 t "Kotlin 2.3.21 (78)"          78   "$SRC_KOTLIN"
 t "Scala 3.8.3 (81)"            81   "$SRC_SCALA"
+
+# ────────────────────────────────────────────────────────────────────────
+section "C# / .NET"
+t "C# Mono 6.12.0.122 (3006)"   3006 "$SRC_CSHARP"
+t "C# .NET Core 7.0.400 (3007)" 3007 "$SRC_CSHARP"
+t "C# .NET Core 8.0.302 (3008)" 3008 "$SRC_CSHARP"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Compiled"

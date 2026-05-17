@@ -213,5 +213,32 @@
     assets: [
       { name: "wave.vcd", identification: '\.vcd$', max_size: 20480 }
     ]
+  },
+  # C# lanes restored on top of the cgroup-v2-capable compiler image.
+  # We keep them as new ids instead of reusing historical ids because
+  # those old ids were repurposed/archived during earlier trim cycles.
+  {
+    id: 3006,
+    name: "C# (Mono 6.12.0.122)",
+    is_archived: false,
+    source_file: "Main.cs",
+    compile_cmd: "mcs %s Main.cs",
+    run_cmd: "mono Main.exe"
+  },
+  {
+    id: 3007,
+    name: "C# (.NET Core SDK 7.0.400)",
+    is_archived: false,
+    source_file: "Main.cs",
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
+  },
+  {
+    id: 3008,
+    name: "C# (.NET Core SDK 8.0.302)",
+    is_archived: false,
+    source_file: "Main.cs",
+    compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
+    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
   }
 ]
