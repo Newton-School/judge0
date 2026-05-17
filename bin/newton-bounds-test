@@ -262,6 +262,9 @@ loop:   b loop'
 # ── plan ──
 TLE_OPTS='{"cpu_time_limit":1,"wall_time_limit":5}'
 OOM_OPTS='{"memory_limit":65536}'   # 64 MB cap; programs alloc 200 MB
+CSHARP_DOTNET_HELLO_OPTS='{"max_file_size":4194304}'
+CSHARP_DOTNET_TLE_OPTS='{"cpu_time_limit":1,"wall_time_limit":5,"max_file_size":4194304}'
+CSHARP_DOTNET_OOM_OPTS='{"memory_limit":65536,"max_file_size":4194304}'   # 64 MB cap; programs alloc 200 MB
 
 echo "Target: $URL"
 echo "Bounds: cpu_time_limit=1 (TLE probe), memory_limit=65536KB / alloc 200MB (OOM probe)"
@@ -288,8 +291,8 @@ for mode in sync async; do
   run "Scala 81"         "$mode" 'Accepted' 81   "$SCALA_HELLO"
   run "SQL 82"           "$mode" 'Accepted' 82   "$SQL_HELLO"
   run "C# Mono 3006"     "$mode" 'Accepted' 3006 "$CSHARP_HELLO"
-  run "C# .NET 7 3007"   "$mode" 'Accepted' 3007 "$CSHARP_HELLO"
-  run "C# .NET 8 3008"   "$mode" 'Accepted' 3008 "$CSHARP_HELLO"
+  run "C# .NET 7 3007"   "$mode" 'Accepted' 3007 "$CSHARP_HELLO" "$CSHARP_DOTNET_HELLO_OPTS"
+  run "C# .NET 8 3008"   "$mode" 'Accepted' 3008 "$CSHARP_HELLO" "$CSHARP_DOTNET_HELLO_OPTS"
   run "Node.js 1999"     "$mode" 'Accepted' 1999 "$NODE_HELLO"
   run "Python ML 2000"   "$mode" 'Accepted' 2000 "$PY_HELLO"
   run "MIPS 3001"        "$mode" 'Accepted' 3001 "$MIPS_HELLO"
@@ -311,8 +314,8 @@ for mode in sync async; do
   run "Scala TLE"        "$mode" 'Time Limit'  81   "$SCALA_TLE"   "$TLE_OPTS"
   run "SQL TLE"          "$mode" 'Time Limit'  82   "$SQL_TLE"     "$TLE_OPTS"
   run "C# Mono TLE"      "$mode" 'Time Limit'  3006 "$CSHARP_TLE"  "$TLE_OPTS"
-  run "C# .NET 7 TLE"    "$mode" 'Time Limit'  3007 "$CSHARP_TLE"  "$TLE_OPTS"
-  run "C# .NET 8 TLE"    "$mode" 'Time Limit'  3008 "$CSHARP_TLE"  "$TLE_OPTS"
+  run "C# .NET 7 TLE"    "$mode" 'Time Limit'  3007 "$CSHARP_TLE"  "$CSHARP_DOTNET_TLE_OPTS"
+  run "C# .NET 8 TLE"    "$mode" 'Time Limit'  3008 "$CSHARP_TLE"  "$CSHARP_DOTNET_TLE_OPTS"
   run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE"    "$TLE_OPTS"
   run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"      "$TLE_OPTS"
   run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"    "$TLE_OPTS"
@@ -331,8 +334,8 @@ for mode in sync async; do
   run "R OOM"            "$mode" 'Runtime Error|Memory Limit|Killed' 80   "$R_OOM"       "$OOM_OPTS"
   run "Scala OOM"        "$mode" 'Runtime Error|Memory Limit|Killed' 81   "$SCALA_OOM"   "$OOM_OPTS"
   run "C# Mono OOM"      "$mode" 'Runtime Error|Memory Limit|Killed' 3006 "$CSHARP_OOM"  "$OOM_OPTS"
-  run "C# .NET 7 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3007 "$CSHARP_OOM"  "$OOM_OPTS"
-  run "C# .NET 8 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3008 "$CSHARP_OOM"  "$OOM_OPTS"
+  run "C# .NET 7 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3007 "$CSHARP_OOM"  "$CSHARP_DOTNET_OOM_OPTS"
+  run "C# .NET 8 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3008 "$CSHARP_OOM"  "$CSHARP_DOTNET_OOM_OPTS"
   run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"    "$OOM_OPTS"
   run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"      "$OOM_OPTS"
 
