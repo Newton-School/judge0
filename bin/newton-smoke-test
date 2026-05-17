@@ -35,7 +35,6 @@ FAIL=0
 SKIP=0
 FAILED=()
 SKIPPED=()
-CSHARP_DOTNET_FILE_SIZE=4194304
 
 if ! command -v jq >/dev/null; then
     echo "ERROR: jq is required (brew install jq / apt-get install jq)" >&2
@@ -68,21 +67,6 @@ t_mem() {
     local payload resp
     payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" --argjson mem "$mem" \
         '{language_id:$lid, source_code:$sc, memory_limit:$mem}')"
-    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
-        -H 'Content-Type: application/json' -d "$payload")"
-    _check_resp "$name" "$lid" "$expected" "$resp"
-}
-
-# t_file_size <name> <language_id> <source_code> <max_file_size_kib> [<expected_substring>]
-# Same as t() but pins an explicit max_file_size on the submission. Used for
-# modern C# experiments where we want to try a large finite file-size cap from
-# the request path instead of Judge0-side special casing.
-t_file_size() {
-    local name="$1" lid="$2" src="$3" max_file_size="$4"
-    local expected="${5:-$EXPECTED}"
-    local payload resp
-    payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" --argjson max_file_size "$max_file_size" \
-        '{language_id:$lid, source_code:$sc, max_file_size:$max_file_size}')"
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
         -H 'Content-Type: application/json' -d "$payload")"
     _check_resp "$name" "$lid" "$expected" "$resp"
@@ -400,8 +384,8 @@ t "Scala 3.8.3 (81)"            81   "$SRC_SCALA"
 # ────────────────────────────────────────────────────────────────────────
 section "C# / .NET"
 t "C# Mono 6.12.0.122 (3006)"   3006 "$SRC_CSHARP"
-t_file_size "C# .NET Core 7.0.400 (3007)" 3007 "$SRC_CSHARP" "$CSHARP_DOTNET_FILE_SIZE"
-t_file_size "C# .NET Core 8.0.302 (3008)" 3008 "$SRC_CSHARP" "$CSHARP_DOTNET_FILE_SIZE"
+t "C# .NET Core 7.0.400 (3007)" 3007 "$SRC_CSHARP"
+t "C# .NET Core 8.0.302 (3008)" 3008 "$SRC_CSHARP"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Compiled"
