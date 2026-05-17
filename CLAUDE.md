@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.33` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.35` | what we layer on |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -111,9 +111,9 @@ language ids exist and what they invoke. Editing it requires a
   `tb.v:N: $finish called at T (1s)` epilogue (or use `$finish(0);` in
   the testbench to suppress that line at source). Full design rationale
   in `docs/superpowers/specs/2026-05-02-iverilog-integration-design.md`.
-- **C# .NET 7 / .NET 8 (ids 3007/3008).** dotnet on Linux uses a W^X
-  double-mapped JIT code allocator that calls `memfd_create` +
-  `ftruncate` to reserve a code cache sized from host RAM. On EC2 prod
+- **C# .NET 7 / .NET 8 / .NET 10 (ids 3007/3008/3009).** dotnet on Linux
+  uses a W^X double-mapped JIT code allocator that calls `memfd_create`
+  + `ftruncate` to reserve a code cache sized from host RAM. On EC2 prod
   that reservation exceeds isolate's `RLIMIT_FSIZE` and kills dotnet
   with SIGXFSZ during runtime init — before any user-visible output.
   Fix: `DOTNET_EnableWriteXorExecute=0` lives in the compiler image's
@@ -184,10 +184,10 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Expected (post-0.76
-with three C# lanes on compiler 0.33 — Mono 3006, .NET 7 3007,
-.NET 8 3008; plus the three Verilog cases from 0.67):
-**28 PASS / 0 FAIL / 0 SKIP** on amd64; **26 PASS / 0 FAIL / 2 SKIP** on
+Submits a hello-world for every active language id. Expected (branch state
+with four C# lanes — Mono 3006, .NET 7 3007, .NET 8 3008, .NET 10 3009;
+plus the three Verilog cases from 0.67):
+**29 PASS / 0 FAIL / 0 SKIP** on amd64; **27 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
@@ -253,12 +253,10 @@ in `judge0.conf` explain each. Summary:
 ## Image is published as
 
 - Docker Hub: `newtonschool/newton-judge0`
-- Current tag: **`0.76`** — adds three C# lanes on compiler 0.33:
-  3006 Mono 6.12, 3007 .NET 7.0.400, 3008 .NET 8.0.302. Compiler base
-  bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
-  for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
-  `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
-  28/0/0 on amd64.
+- Current branch consumes compiler base **`0.35`**. The C# lane set is
+  unchanged from the 0.33-era rollout: 3006 Mono 6.12, 3007 .NET 7.0.400,
+  3008 .NET 8.0.302, with `DOTNET_EnableWriteXorExecute=0` still propagated
+  into isolate via `-E DOTNET_EnableWriteXorExecute`.
 - Production still runs `newton-judge0:0.67` from ECR
   (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-05;
   update this line once 0.76 ships. Smoke green against
