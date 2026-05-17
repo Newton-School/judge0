@@ -171,7 +171,7 @@ class IsolateJob < ApplicationJob
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
-    -E DOTNET_EnableWriteXorExecute \
+    #{language_env_flags} \
     -d /etc:noexec \
     --run \
     -- /bin/bash compile > #{compile_output_file} \
@@ -244,7 +244,7 @@ class IsolateJob < ApplicationJob
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
-    -E DOTNET_EnableWriteXorExecute \
+    #{language_env_flags} \
     -d /etc:noexec \
     --run \
     -- /bin/bash run \
@@ -308,6 +308,17 @@ class IsolateJob < ApplicationJob
     end
     `isolate #{cgroups} -b #{box_id} --cleanup`
     raise "Cleanup of sandbox #{box_id} failed." if raise_exception && Dir.exists?(workdir)
+  end
+
+  # Per-language env var propagation. isolate strips the parent env by
+  # default; `-E NAME` (no value) re-exposes the parent's value of NAME
+  # to the sandboxed process. Values are sourced from the compiler
+  # image's Dockerfile ENV (e.g. DOTNET_EnableWriteXorExecute=0); the
+  # `env:` array in active.rb declares which names to propagate.
+  # Empty/nil collapses to "" — collapsed away by the gsub(/\s+/, " ")
+  # used for logging and harmless in the shell command itself.
+  def language_env_flags
+    Array(submission.language.env).map { |name| "-E #{name}" }.join(" ")
   end
 
   # Phase 3 — capture language-declared artifacts (e.g. Verilog .vcd

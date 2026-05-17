@@ -225,13 +225,24 @@
     compile_cmd: "mcs %s Main.cs",
     run_cmd: "mono Main.exe"
   },
+  # env: propagated through isolate via `-E NAME` (values from compiler
+  # image's Tier 12 ENV). EnableWriteXorExecute=0 disables .NET's W^X
+  # double-mapped JIT allocator that trips RLIMIT_FSIZE → SIGXFSZ on
+  # large-RAM hosts; NOLOGO and CLI_TELEMETRY_OPTOUT suppress first-run
+  # banner and outbound telemetry HTTP calls. SKIP_FIRST_TIME_EXPERIENCE
+  # and MULTILEVEL_LOOKUP are deliberately omitted (no-ops on .NET 7+).
   {
     id: 3007,
     name: "C# (.NET Core SDK 7.0.400)",
     is_archived: false,
     source_file: "Main.cs",
     compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"7.0.400\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net7.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
-    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
+    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj",
+    env: %w[
+      DOTNET_EnableWriteXorExecute
+      DOTNET_NOLOGO
+      DOTNET_CLI_TELEMETRY_OPTOUT
+    ]
   },
   {
     id: 3008,
@@ -239,6 +250,11 @@
     is_archived: false,
     source_file: "Main.cs",
     compile_cmd: "mkdir -p .dotnet-home && printf '%%s\n' '{' '  \"sdk\": {' '    \"version\": \"8.0.302\",' '    \"rollForward\": \"disable\"' '  }' '}' > global.json && printf '%%s\n' '<Project Sdk=\"Microsoft.NET.Sdk\">' '  <PropertyGroup>' '    <OutputType>Exe</OutputType>' '    <TargetFramework>net8.0</TargetFramework>' '  </PropertyGroup>' '</Project>' > Main.csproj && DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet build Main.csproj -nologo >/dev/null",
-    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj"
+    run_cmd: "DOTNET_CLI_HOME=\"$PWD/.dotnet-home\" dotnet run --no-build --project Main.csproj",
+    env: %w[
+      DOTNET_EnableWriteXorExecute
+      DOTNET_NOLOGO
+      DOTNET_CLI_TELEMETRY_OPTOUT
+    ]
   }
 ]
