@@ -5,21 +5,25 @@
 #   bundle exec ruby bin/lint-active-rb
 #   ./bin/lint-active-rb                    # if executable
 #
-# Intended to run in CI before `docker push` so malformed asset
+# Intended to run in CI before `docker push` so malformed asset or env
 # declarations are caught at PR time, not at container boot. The same
-# AssetValidator logic also runs in db/seeds.rb (Layer 1, runtime
-# safety) — this script is the Layer 2 / pre-merge gate.
+# validators also run in db/seeds.rb (Layer 1, runtime safety) — this
+# script is the Layer 2 / pre-merge gate.
 #
 # Per docs/superpowers/specs/2026-05-05-submission-assets-design.md.
 
 require_relative "../db/languages/active"
 require_relative "../db/languages/asset_validator"
+require_relative "../db/languages/env_validator"
 
-errors = @languages.flat_map { |lang| AssetValidator.validate_language(lang) }
+errors = @languages.flat_map do |lang|
+  AssetValidator.validate_language(lang) + EnvValidator.validate_language(lang)
+end
 
 if errors.empty?
-  decl_count = @languages.sum { |l| Array(l[:assets]).size }
-  puts "OK — #{@languages.count} languages, #{decl_count} asset declarations validated."
+  asset_count = @languages.sum { |l| Array(l[:assets]).size }
+  env_count   = @languages.sum { |l| Array(l[:env]).size }
+  puts "OK — #{@languages.count} languages, #{asset_count} asset declarations, #{env_count} env declarations validated."
   exit 0
 else
   warn "active.rb has #{errors.size} problem(s):"

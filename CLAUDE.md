@@ -117,12 +117,27 @@ language ids exist and what they invoke. Editing it requires a
   that reservation exceeds isolate's `RLIMIT_FSIZE` and kills dotnet
   with SIGXFSZ during runtime init — before any user-visible output.
   Fix: `DOTNET_EnableWriteXorExecute=0` lives in the compiler image's
-  Tier 12 ENV (compiler 0.33+), and `IsolateJob` propagates it via
-  `-E DOTNET_EnableWriteXorExecute` on both compile and run commands.
-  Without the `-E` propagation it doesn't reach the sandbox (isolate
-  strips env by default). Diagnostic fingerprint when broken: compile
-  exits 153 (=128+25=SIGXFSZ) with empty stdout/stderr. Mono (3006)
-  uses a different runtime and doesn't need this.
+  Tier 12 ENV (compiler 0.33+); the per-language `env:` array on each
+  .NET record (see "Per-language env propagation" below) declares it
+  alongside `DOTNET_NOLOGO` and `DOTNET_CLI_TELEMETRY_OPTOUT`, and
+  `IsolateJob` re-exposes those names to the sandbox via `-E NAME` on
+  both compile and run. Without that propagation isolate strips them.
+  Diagnostic fingerprint when broken: compile exits 153 (=128+25=
+  SIGXFSZ) with empty stdout/stderr. Mono (3006) uses a different
+  runtime and ships no `env:` array.
+- **Per-language env propagation (`env:` on active.rb).** Languages
+  with runtime-specific environment needs (e.g. .NET's
+  `DOTNET_EnableWriteXorExecute`) declare an `env:` array of bare env
+  var NAMES on their `active.rb` record. `IsolateJob#language_env_flags`
+  expands those into `-E NAME` flags, splicing them into both compile
+  and run isolate commands. Values are sourced from the compiler
+  image's Dockerfile ENV — `active.rb` only declares which names to
+  propagate (the NAME-only form, not `NAME=value`). Validation
+  (`EnvValidator`) runs at seed time and via `bin/lint-active-rb`:
+  must be an Array of String, each entry a POSIX-style env var name
+  (`[A-Za-z_][A-Za-z0-9_]*` — mixed case allowed because .NET names
+  aren't all-uppercase). Languages with no env requirements simply
+  omit the key.
 - **Submission assets (Phase 3, new in 0.67).** Languages may declare
   an `assets:` array in `active.rb` (Verilog 3005 declares `wave.vcd`
   with regex `\.vcd$`). After `run_cmd` exits, `IsolateJob` calls

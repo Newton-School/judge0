@@ -12,6 +12,7 @@
 
 class Language < ApplicationRecord
   serialize :assets
+  serialize :env
 
   validates :name, presence: true
   validates :source_file, :run_cmd, presence: true, unless: -> { is_project }
