@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.33` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.35` | what we layer on |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -253,12 +253,10 @@ in `judge0.conf` explain each. Summary:
 ## Image is published as
 
 - Docker Hub: `newtonschool/newton-judge0`
-- Current tag: **`0.76`** — adds three C# lanes on compiler 0.33:
-  3006 Mono 6.12, 3007 .NET 7.0.400, 3008 .NET 8.0.302. Compiler base
-  bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
-  for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
-  `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
-  28/0/0 on amd64.
+- Current branch consumes compiler base **`0.35`**. The C# lane set is
+  unchanged from the 0.33-era rollout: 3006 Mono 6.12, 3007 .NET 7.0.400,
+  3008 .NET 8.0.302, with `DOTNET_EnableWriteXorExecute=0` still propagated
+  into isolate via `-E DOTNET_EnableWriteXorExecute`.
 - Production still runs `newton-judge0:0.67` from ECR
   (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-05;
   update this line once 0.76 ships. Smoke green against
