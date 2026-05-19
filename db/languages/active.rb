@@ -1,4 +1,14 @@
 @languages ||= []
+
+circuitrun_assets = [
+  { name: "result.json", identification: '\Aartifacts/result\.json\z', max_size: 65_536 },
+  { name: "trace.ndjson", identification: '\Aartifacts/trace\.ndjson\z', max_size: 8_388_608 },
+  { name: "waveform.json", identification: '\Aartifacts/waveform\.json\z', max_size: 2_097_152 },
+  { name: "serial.log", identification: '\Aartifacts/serial\.log\z', max_size: 1_048_576 },
+  { name: "devices.json", identification: '\Aartifacts/devices\.json\z', max_size: 524_288 },
+  { name: "timing.json", identification: '\Aartifacts/timing\.json\z', max_size: 65_536 }
+]
+
 @languages +=
 [
   # 0.28: Plain Text restored (was archived in 0.59 trim). Needs no
@@ -186,6 +196,21 @@
     source_file: "Main.jack",
     run_cmd: "nand2tetris run Main.jack"
   },
+  # CircuitRun: embedded-systems labs run through a stable Judge0 stdio
+  # contract. The source file contains the student program; stdin contains
+  # one testcase payload with scenario/check/artifact selection. CircuitRun
+  # performs behavioral verification and prints CIRCUITRUN_EVALUATE_ACCEPTED
+  # only when the testcase passes. Rich outputs are captured as assets.
+  {
+    id: 4100,
+    name: "CircuitRun Arduino Uno Arduino C++",
+    is_archived: false,
+    source_file: "main.ino",
+    run_cmd: "circuitrun-judge0-runner judge0-evaluate --board arduino-uno --language arduino-cpp --source main.ino --asset-dir artifacts",
+    assets: circuitrun_assets
+  },
+  # Additional CircuitRun board/language ids should be promoted here only
+  # after the compilers image consumes a matching dist profile for that route.
   # Verilog (Icarus 13.0): student submits the DUT module(s) as source_code;
   # instructor-supplied testbench arrives via stdin. compile_cmd parse-checks
   # the DUT alone with `iverilog -tnull` so pure DUT syntax errors land in

@@ -108,14 +108,41 @@ RSpec.describe AssetCapture do
     expect(submission.submission_assets.count).to eq(0)
   end
 
-  it "ignores subdirectories when matching filenames" do
+  it "captures nested asset paths when the regex matches the relative path" do
+    FileUtils.mkdir_p(File.join(@box, "artifacts"))
+    File.write(File.join(@box, "artifacts", "result.json"), '{"status":"accepted"}')
+
+    described_class.new(
+      box_path: @box,
+      submission: submission,
+      declarations: [
+        { name: "result.json", identification: '\Aartifacts/result\.json\z', max_size: 20480 }
+      ]
+    ).call
+
+    a = submission.submission_assets.first
+    expect(a.logical_name).to eq("result.json")
+    expect(a.source_filename).to eq("artifacts/result.json")
+    expect(Base64.decode64(a.data)).to eq('{"status":"accepted"}')
+  end
+
+  it "ignores matching directory names while walking recursively" do
     Dir.mkdir(File.join(@box, "sub.vcd")) # directory whose name happens to match
     File.write(File.join(@box, "sub.vcd", "inner.vcd"), "inner")
     File.write(File.join(@box, "real.vcd"), "real")
 
     described_class.new(box_path: @box, submission: submission, declarations: [declaration]).call
 
-    a = submission.submission_assets.first
-    expect(a.source_filename).to eq("real.vcd")
+    expect(submission.submission_assets.map(&:source_filename)).to eq(["real.vcd"])
+  end
+
+  it "does not capture symlinks that match asset declarations" do
+    target = File.join(@box, "outside.txt")
+    File.write(target, "secret")
+    File.symlink(target, File.join(@box, "wave.vcd"))
+
+    described_class.new(box_path: @box, submission: submission, declarations: [declaration]).call
+
+    expect(submission.submission_assets.count).to eq(0)
   end
 end

@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.33` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0.36` | what we layer on |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -199,11 +199,11 @@ binaries — Ruby version, gems via `bundle install`, etc. — need a rebuild).
 JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
-Submits a hello-world for every active language id. Expected (post-0.76
-with three C# lanes on compiler 0.33 — Mono 3006, .NET 7 3007,
-.NET 8 3008; plus the three Verilog cases from 0.67):
-**28 PASS / 0 FAIL / 0 SKIP** on amd64; **26 PASS / 0 FAIL / 2 SKIP** on
-arm64 (NASM and FreeBASIC are amd64-only upstream).
+Submits a hello-world or equivalent behavioral smoke for every active language
+id. Expected after CircuitRun Arduino Uno support on top of 0.76:
+**30 PASS / 0 FAIL / 0 SKIP** on amd64; **28 PASS / 0 FAIL / 2 SKIP** on
+arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
+CircuitRun result artifacts each add an asset-metadata PASS.
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
@@ -224,7 +224,7 @@ in `judge0.conf` explain each. Summary:
 | `MAX_MAX_PROCESSES_AND_OR_THREADS` | 120 | **4096** | compile-time max |
 | `MAX_FILE_SIZE` | 1 MB | **1 GiB** | Go 1.23 binaries + Java class+jar bundles can exceed 1 MB |
 | `MAX_MAX_FILE_SIZE` | 4 MB | **2 GiB** | per-submission max |
-| `MAX_MAX_ASSET_SIZE` | – (new in 0.67) | **20480** (20 KB) | Phase 3 asset cap; clamps any per-language `max_size` |
+| `MAX_MAX_ASSET_SIZE` | – (new in 0.67) | **1048576** (1 MiB) | Phase 3 asset cap; clamps any per-language `max_size`; keeps first-pass CircuitRun artifact capture bounded |
 
 ## Common pitfalls
 
