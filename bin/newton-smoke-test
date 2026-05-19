@@ -373,7 +373,7 @@ STDIN_CIRCUITRUN_ARDUINO='{
     }
   ],
   "artifacts": {
-    "enabled": ["result.json", "trace.ndjson", "waveform.json", "serial.log"]
+    "enabled": ["result.json", "waveform.json", "serial.log"]
   },
   "limits": {
     "max_wall_ms": 20000
@@ -493,7 +493,7 @@ t_stdin_with_asset "Verilog 3005 with wave.vcd" 3005 \
 # CircuitRun: stdin is the testcase payload; source_code is the Arduino sketch.
 # The runner prints CIRCUITRUN_EVALUATE_ACCEPTED only after CircuitRun has
 # compiled, simulated, verified behavior, and written requested artifacts.
-t_stdin_with_asset "CircuitRun Arduino Uno Arduino C++ (4100)" 4100 \
+t_stdin_with_asset "CircuitRun Arduino Uno Arduino C++ (3009)" 3009 \
     "$SRC_CIRCUITRUN_ARDUINO" "$STDIN_CIRCUITRUN_ARDUINO" \
     "CIRCUITRUN_EVALUATE_ACCEPTED" "result.json"
 
