@@ -267,7 +267,7 @@
     name: "CircuitRun Arduino Uno Arduino C++",
     is_archived: false,
     source_file: "main.ino",
-    run_cmd: "circuitrun-judge0-runner judge0-evaluate --board arduino-uno --language arduino-cpp --source main.ino --asset-dir artifacts",
+    run_cmd: "circuitrun-judge0-runner judge0-run --board arduino-uno --language arduino-cpp --source main.ino --asset-dir artifacts",
     assets: [
       { name: "result.json", identification: '\Aartifacts/result\.json\z', max_size: 102_400 },
       { name: "waveform.json", identification: '\Aartifacts/waveform\.json\z', max_size: 102_400 },
