@@ -47,54 +47,30 @@ PASS=0
 FAIL=0
 declare -a FAILURES=()
 
+submission_payload() {
+  local lang="$1" src="$2" opts="$3" stdin="${4:-}"
+  [ -z "$opts" ] && opts='{}'
+  if [ -n "$stdin" ]; then
+    jq -nc --arg sc "$src" --arg si "$stdin" --argjson lang "$lang" --argjson opts "$opts" \
+      '$opts + {language_id:$lang, source_code:$sc, stdin:$si}'
+  else
+    jq -nc --arg sc "$src" --argjson lang "$lang" --argjson opts "$opts" \
+      '$opts + {language_id:$lang, source_code:$sc}'
+  fi
+}
+
 post_sync() {
-  local lang="$1" src="$2" opts="$3"
-  jq -nc --arg sc "$src" --argjson lang "$lang" --argjson opts "$opts" \
-    '$opts + {language_id:$lang, source_code:$sc}' \
+  local lang="$1" src="$2" opts="$3" stdin="${4:-}"
+  submission_payload "$lang" "$src" "$opts" "$stdin" \
   | curl -sS --max-time 60 -X POST \
       "${URL}/submissions?wait=true&fields=status,stdout,stderr,message,compile_output,time,memory" \
       -H 'Content-Type: application/json' --data @-
 }
 
 post_async() {
-  local lang="$1" src="$2" opts="$3"
+  local lang="$1" src="$2" opts="$3" stdin="${4:-}"
   local token
-  token="$(jq -nc --arg sc "$src" --argjson lang "$lang" --argjson opts "$opts" \
-    '$opts + {language_id:$lang, source_code:$sc}' \
-    | curl -sS --max-time 30 -X POST "${URL}/submissions?wait=false" \
-        -H 'Content-Type: application/json' --data @- \
-    | jq -r '.token // empty')"
-  if [ -z "$token" ]; then
-    echo '{"status":{"description":"NO TOKEN"}}'
-    return 1
-  fi
-  for _ in $(seq 1 "$POLL_TRIES"); do
-    local body sid
-    body="$(curl -sS --max-time 10 \
-      "${URL}/submissions/${token}?fields=status,stdout,stderr,message,compile_output,time,memory")"
-    sid="$(echo "$body" | jq -r '.status.id // empty')"
-    case "$sid" in
-      ""|1|2) sleep "$POLL_INTERVAL" ;;
-      *) echo "$body"; return 0 ;;
-    esac
-  done
-  echo '{"status":{"description":"POLL TIMEOUT"}}'
-}
-
-post_sync_stdin() {
-  local lang="$1" src="$2" stdin="$3" opts="$4"
-  jq -nc --arg sc "$src" --arg si "$stdin" --argjson lang "$lang" --argjson opts "$opts" \
-    '$opts + {language_id:$lang, source_code:$sc, stdin:$si}' \
-  | curl -sS --max-time 60 -X POST \
-      "${URL}/submissions?wait=true&fields=status,stdout,stderr,message,compile_output,time,memory" \
-      -H 'Content-Type: application/json' --data @-
-}
-
-post_async_stdin() {
-  local lang="$1" src="$2" stdin="$3" opts="$4"
-  local token
-  token="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lang "$lang" --argjson opts "$opts" \
-    '$opts + {language_id:$lang, source_code:$sc, stdin:$si}' \
+  token="$(submission_payload "$lang" "$src" "$opts" "$stdin" \
     | curl -sS --max-time 30 -X POST "${URL}/submissions?wait=false" \
         -H 'Content-Type: application/json' --data @- \
     | jq -r '.token // empty')"
@@ -116,37 +92,13 @@ post_async_stdin() {
 }
 
 run() {
-  local name="$1" mode="$2" expect="$3" lang="$4" src="$5" opts="${6:-}"
-  [ -z "$opts" ] && opts='{}'
-  local resp st time mem extra
-  if [ "$mode" = "sync" ]; then
-    resp="$(post_sync "$lang" "$src" "$opts")"
-  else
-    resp="$(post_async "$lang" "$src" "$opts")"
-  fi
-  st="$(echo "$resp" | jq -r '.status.description // "?"')"
-  time="$(echo "$resp" | jq -r '.time // "-"')"
-  mem="$(echo "$resp" | jq -r '.memory // "-"')"
-  if echo "$st" | grep -qiE "$expect"; then
-    PASS=$((PASS+1))
-    printf '  PASS  [%-5s] %-22s status=%-28s t=%-7s mem=%s\n' "$mode" "$name" "$st" "$time" "$mem"
-  else
-    FAIL=$((FAIL+1))
-    FAILURES+=("[$mode] $name — expected /$expect/ got '$st'")
-    extra="$(echo "$resp" | jq -r '(.message // .stderr // .compile_output // "") | .[0:60] | gsub("[\\n\\r\\t]"; " ")')"
-    printf '  FAIL  [%-5s] %-22s status=%-28s t=%-7s mem=%-10s %s\n' "$mode" "$name" "$st" "$time" "$mem" "$extra"
-  fi
-}
-
-run_stdin() {
-  local name="$1" mode="$2" expect="$3" lang="$4" src="$5" stdin="$6" opts="${7:-}"
-  local stdout_expect="${8:-}"
+  local name="$1" mode="$2" expect="$3" lang="$4" src="$5" opts="${6:-}" stdin="${7:-}" stdout_expect="${8:-}"
   [ -z "$opts" ] && opts='{}'
   local resp st stdout time mem extra expected_detail
   if [ "$mode" = "sync" ]; then
-    resp="$(post_sync_stdin "$lang" "$src" "$stdin" "$opts")"
+    resp="$(post_sync "$lang" "$src" "$opts" "$stdin")"
   else
-    resp="$(post_async_stdin "$lang" "$src" "$stdin" "$opts")"
+    resp="$(post_async "$lang" "$src" "$opts" "$stdin")"
   fi
   st="$(echo "$resp" | jq -r '.status.description // "?"')"
   stdout="$(echo "$resp" | jq -r '.stdout // ""')"
@@ -394,7 +346,7 @@ for mode in sync async; do
   run "Node.js 1999"     "$mode" 'Accepted' 1999 "$NODE_HELLO"
   run "Python ML 2000"   "$mode" 'Accepted' 2000 "$PY_HELLO"
   run "MIPS 3001"        "$mode" 'Accepted' 3001 "$MIPS_HELLO"
-  run_stdin "CircuitRun 3009" "$mode" 'Accepted' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_ARDUINO_STDIN" '{}' 'CIRCUITRUN_EVALUATE_ACCEPTED'
+  run "CircuitRun 3009" "$mode" 'Accepted' 3009 "$CIRCUITRUN_ARDUINO_HELLO" '{}' "$CIRCUITRUN_ARDUINO_STDIN" 'CIRCUITRUN_EVALUATE_ACCEPTED'
 
   echo "── TLE: cpu_time_limit=1, busy loop ──"
   run "NASM TLE"         "$mode" 'Time Limit'  45   "$NASM_TLE"    "$TLE_OPTS"
@@ -418,7 +370,7 @@ for mode in sync async; do
   run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE"    "$TLE_OPTS"
   run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"      "$TLE_OPTS"
   run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"    "$TLE_OPTS"
-  run_stdin "CircuitRun TLE" "$mode" 'Time Limit' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_ARDUINO_STDIN" "$TLE_OPTS"
+  run "CircuitRun TLE" "$mode" 'Time Limit' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$TLE_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
 
   echo "── OOM: memory_limit=65536 (64 MB), alloc 200 MB ──"
   run "FreeBASIC OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 47   "$FBASIC_OOM"  "$OOM_OPTS"
@@ -438,7 +390,7 @@ for mode in sync async; do
   run "C# .NET 8 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3008 "$CSHARP_OOM"  "$OOM_OPTS"
   run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"    "$OOM_OPTS"
   run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"      "$OOM_OPTS"
-  run_stdin "CircuitRun OOM" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_ARDUINO_STDIN" "$OOM_OPTS"
+  run "CircuitRun OOM" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$OOM_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
 
   echo
 done
