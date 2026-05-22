@@ -10,15 +10,17 @@
 #   - hello world (default limits)         → expect Accepted
 #   - busy loop (cpu_time_limit=1)         → expect Time Limit Exceeded
 #   - 200 MB alloc (memory_limit=65536 KB) → expect Runtime Error (cgroup-v2 OOM kill)
+#   - CircuitRun under 64 MB               → expect runtime/memory failure; this is a
+#                                             low-memory floor probe, not emulated MCU OOM
 #
 # Coverage: every active language that has natural busy-loop / alloc semantics.
 # Skipped intentionally:
 #   - 3000 HDL  / 3002 Jack — deterministic simulators driven by stdin harnesses;
 #                              no general-purpose looping or alloc primitives.
 # Partially covered:
-#   - 3009 CircuitRun — uses a valid scenario payload for HELLO/TLE/OOM probes;
-#                       TLE/OOM validate Judge0 limit enforcement around the
-#                       CircuitRun runner, not arbitrary student busy-loop/allocation code.
+#   - 3009 CircuitRun — uses a valid scenario payload for HELLO/TLE and low-memory
+#                       probes. TLE/low-memory validate Judge0 enforcement around the
+#                       CircuitRun runner, not arbitrary firmware looping or MCU SRAM OOM.
 #   - 43 Plain Text — HELLO only (cat-based; can't busy-loop or alloc).
 #   - 45 NASM   — HELLO + TLE  (raw-asm OOM via brk/mmap is impractical here)
 #   - 46 Bash   — HELLO + TLE  (bash mass-alloc is awkward)
@@ -315,9 +317,11 @@ CIRCUITRUN_ARDUINO_STDIN='{
 # ── plan ──
 TLE_OPTS='{"cpu_time_limit":1,"wall_time_limit":5}'
 OOM_OPTS='{"memory_limit":65536}'   # 64 MB cap; programs alloc 200 MB
+CIRCUITRUN_LOW_MEMORY_OPTS='{"memory_limit":65536}'   # 64 MB cap; valid CircuitRun should not fit
 
 echo "Target: $URL"
 echo "Bounds: cpu_time_limit=1 (TLE probe), memory_limit=65536KB / alloc 200MB (OOM probe)"
+echo "CircuitRun: memory_limit=65536KB is a low-memory floor probe, not student-code OOM"
 echo
 
 for mode in sync async; do
@@ -390,7 +394,9 @@ for mode in sync async; do
   run "C# .NET 8 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3008 "$CSHARP_OOM"  "$OOM_OPTS"
   run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"    "$OOM_OPTS"
   run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"      "$OOM_OPTS"
-  run "CircuitRun OOM" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$OOM_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
+
+  echo "── CircuitRun low-memory floor: memory_limit=65536 (64 MB), valid blink ──"
+  run "CircuitRun low memory" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_LOW_MEMORY_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
 
   echo
 done
