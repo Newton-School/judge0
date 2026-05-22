@@ -16,6 +16,9 @@
 #   - 3000 HDL  / 3002 Jack — deterministic simulators driven by stdin harnesses;
 #                              no general-purpose looping or alloc primitives.
 # Partially covered:
+#   - 3009 CircuitRun — uses a valid scenario payload for HELLO/TLE/OOM probes;
+#                       TLE/OOM validate Judge0 limit enforcement around the
+#                       CircuitRun runner, not arbitrary student busy-loop/allocation code.
 #   - 43 Plain Text — HELLO only (cat-based; can't busy-loop or alloc).
 #   - 45 NASM   — HELLO + TLE  (raw-asm OOM via brk/mmap is impractical here)
 #   - 46 Bash   — HELLO + TLE  (bash mass-alloc is awkward)
@@ -139,7 +142,7 @@ run_stdin() {
   local name="$1" mode="$2" expect="$3" lang="$4" src="$5" stdin="$6" opts="${7:-}"
   local stdout_expect="${8:-}"
   [ -z "$opts" ] && opts='{}'
-  local resp st stdout time mem extra
+  local resp st stdout time mem extra expected_detail
   if [ "$mode" = "sync" ]; then
     resp="$(post_sync_stdin "$lang" "$src" "$stdin" "$opts")"
   else
@@ -154,7 +157,9 @@ run_stdin() {
     printf '  PASS  [%-5s] %-22s status=%-28s t=%-7s mem=%s\n' "$mode" "$name" "$st" "$time" "$mem"
   else
     FAIL=$((FAIL+1))
-    FAILURES+=("[$mode] $name — expected /$expect/ and stdout '$stdout_expect' got status '$st'")
+    expected_detail="/$expect/"
+    [ -n "$stdout_expect" ] && expected_detail="${expected_detail} and stdout '${stdout_expect}'"
+    FAILURES+=("[$mode] $name — expected ${expected_detail} got status '$st'")
     extra="$(echo "$resp" | jq -r '(.message // .stderr // .compile_output // "") | .[0:60] | gsub("[\n\r\t]"; " ")')"
     printf '  FAIL  [%-5s] %-22s status=%-28s t=%-7s mem=%-10s %s\n' "$mode" "$name" "$st" "$time" "$mem" "$extra"
   fi
@@ -413,7 +418,7 @@ for mode in sync async; do
   run "Node TLE"         "$mode" 'Time Limit'  1999 "$NODE_TLE"    "$TLE_OPTS"
   run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"      "$TLE_OPTS"
   run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"    "$TLE_OPTS"
-  echo "  SKIP  [${mode}] CircuitRun TLE       scenario-driven runner; generic busy-loop probes do not model the language contract"
+  run_stdin "CircuitRun TLE" "$mode" 'Time Limit' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_ARDUINO_STDIN" "$TLE_OPTS"
 
   echo "── OOM: memory_limit=65536 (64 MB), alloc 200 MB ──"
   run "FreeBASIC OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 47   "$FBASIC_OOM"  "$OOM_OPTS"
@@ -433,7 +438,7 @@ for mode in sync async; do
   run "C# .NET 8 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3008 "$CSHARP_OOM"  "$OOM_OPTS"
   run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"    "$OOM_OPTS"
   run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"      "$OOM_OPTS"
-  echo "  SKIP  [${mode}] CircuitRun OOM       scenario-driven runner; generic allocation probes do not model the language contract"
+  run_stdin "CircuitRun OOM" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_ARDUINO_STDIN" "$OOM_OPTS"
 
   echo
 done
