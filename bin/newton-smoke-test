@@ -85,7 +85,7 @@ t_stdin() {
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
-# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name>
+# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name> [<memory_limit_kb>]
 # Phase 3 — same as t_stdin, but also asserts the named asset is captured:
 #   1. submission GET (with fields=...,assets) returns metadata with size_bytes>0 and error=null
 #   2. dedicated bytes endpoint returns HTTP 200
@@ -93,10 +93,16 @@ t_stdin() {
 # Verilog problem with $dumpfile contributes 2 entries to the smoke summary.
 t_stdin_with_asset() {
     local name="$1" lid="$2" src="$3" stdin="$4" expected="$5" asset_name="$6"
+    local mem="${7:-}"
     local payload resp token assets_json size err bytes_status
 
-    payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
-        '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    if [[ -n "$mem" ]]; then
+        payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" --argjson mem "$mem" \
+            '{language_id:$lid, source_code:$sc, stdin:$si, memory_limit:$mem}')"
+    else
+        payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
+            '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    fi
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=token,stdout,stderr,status,message,compile_output,assets" \
         -H 'Content-Type: application/json' -d "$payload")"
 
@@ -495,7 +501,7 @@ t_stdin_with_asset "Verilog 3005 with wave.vcd" 3005 \
 # compiled, simulated, verified behavior, and written requested artifacts.
 t_stdin_with_asset "CircuitRun Arduino Uno Arduino C++ (3009)" 3009 \
     "$SRC_CIRCUITRUN_ARDUINO" "$STDIN_CIRCUITRUN_ARDUINO" \
-    "CIRCUITRUN_EVALUATE_ACCEPTED" "result.json"
+    "CIRCUITRUN_EVALUATE_ACCEPTED" "result.json" 256000
 
 # Archived languages are intentionally not tested here — the smoke test
 # verifies the *currently active* surface. See db/languages/archived.rb
