@@ -290,6 +290,12 @@ void loop() {
 
 CIRCUITRUN_ARDUINO_STDIN='{
   "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [],
+    "nets": []
+  },
   "scenario": {
     "duration_ms": 1000,
     "stimuli": []
