@@ -1,4 +1,6 @@
 require "base64"
+require "find"
+require "pathname"
 
 # Captures language-declared artifacts from the isolate sandbox box
 # and persists them as SubmissionAsset rows.
@@ -39,10 +41,18 @@ class AssetCapture
   end
 
   def first_matching_filename(pattern)
-    Dir.entries(@box_path)
-       .select { |f| File.file?(File.join(@box_path, f)) && pattern.match?(f) }
-       .sort
-       .first
+    box = Pathname.new(@box_path)
+    matches = []
+
+    Find.find(@box_path) do |path|
+      next if path == @box_path
+      next unless File.lstat(path).file?
+
+      relative = Pathname.new(path).relative_path_from(box).to_s
+      matches << relative if pattern.match?(relative)
+    end
+
+    matches.sort.first
   end
 
   def build_pattern(identification)

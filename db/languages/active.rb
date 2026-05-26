@@ -256,5 +256,24 @@
       DOTNET_NOLOGO
       DOTNET_CLI_TELEMETRY_OPTOUT
     ]
+  },
+  # CircuitRun: embedded-systems labs run through a stable Judge0 stdio
+  # contract. The source file contains the student program; stdin contains
+  # one testcase payload with scenario/check/artifact selection. CircuitRun
+  # performs behavioral verification and prints CIRCUITRUN_EVALUATE_ACCEPTED
+  # only when the testcase passes. Rich outputs are captured as assets.
+  {
+    id: 3009,
+    name: "CircuitRun Arduino Uno Arduino C++",
+    is_archived: false,
+    source_file: "main.ino",
+    run_cmd: "circuitrun-judge0-runner judge0-run --board arduino-uno --language arduino-cpp --source main.ino --asset-dir artifacts",
+    assets: [
+      { name: "result.json", identification: '\Aartifacts/result\.json\z', max_size: 102_400 },
+      { name: "waveform.json", identification: '\Aartifacts/waveform\.json\z', max_size: 102_400 },
+      { name: "serial.log", identification: '\Aartifacts/serial\.log\z', max_size: 102_400 },
+      { name: "devices.json", identification: '\Aartifacts/devices\.json\z', max_size: 102_400 },
+      { name: "timing.json", identification: '\Aartifacts/timing\.json\z', max_size: 102_400 }
+    ]
   }
 ]

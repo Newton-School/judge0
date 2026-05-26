@@ -85,7 +85,7 @@ t_stdin() {
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
-# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name>
+# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name> [<memory_limit_kb>]
 # Phase 3 — same as t_stdin, but also asserts the named asset is captured:
 #   1. submission GET (with fields=...,assets) returns metadata with size_bytes>0 and error=null
 #   2. dedicated bytes endpoint returns HTTP 200
@@ -93,10 +93,16 @@ t_stdin() {
 # Verilog problem with $dumpfile contributes 2 entries to the smoke summary.
 t_stdin_with_asset() {
     local name="$1" lid="$2" src="$3" stdin="$4" expected="$5" asset_name="$6"
+    local mem="${7:-}"
     local payload resp token assets_json size err bytes_status
 
-    payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
-        '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    if [[ -n "$mem" ]]; then
+        payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" --argjson mem "$mem" \
+            '{language_id:$lid, source_code:$sc, stdin:$si, memory_limit:$mem}')"
+    else
+        payload="$(jq -nc --arg sc "$src" --arg si "$stdin" --argjson lid "$lid" \
+            '{language_id:$lid, source_code:$sc, stdin:$si}')"
+    fi
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=token,stdout,stderr,status,message,compile_output,assets" \
         -H 'Content-Type: application/json' -d "$payload")"
 
@@ -347,6 +353,49 @@ module and_gate_tb;
   end
 endmodule'
 
+SRC_CIRCUITRUN_ARDUINO='void setup() {
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(13, HIGH);
+  delay(100);
+  digitalWrite(13, LOW);
+  delay(100);
+}'
+
+STDIN_CIRCUITRUN_ARDUINO='{
+  "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [],
+    "nets": []
+  },
+  "scenario": {
+    "duration_ms": 1000,
+    "stimuli": []
+  },
+  "checks": [
+    {
+      "type": "pin-toggled",
+      "id": "led-blinks",
+      "pin": "D13",
+      "min_count": 2
+    }
+  ],
+  "artifacts": {
+    "enabled": ["result.json", "waveform.json", "serial.log"]
+  },
+  "limits": {
+    "max_wall_ms": 20000
+  },
+  "context": {
+    "question_id": "judge0-smoke",
+    "test_case_id": "arduino-uno-arduino-cpp"
+  }
+}'
+
 # ────────────────────────────────────────────────────────────────────────
 # 0.59 trim: 25 active languages moved to archived.rb (compiler toolchains
 # dropped from newtonschool/judge0-newton-compiler:0.27). The "Archived"
@@ -452,6 +501,13 @@ t_stdin "Verilog 3005 self-contained / empty stdin" 3005 "$SRC_VERILOG_SELF" "" 
 # entries to the smoke summary (stdout grading + asset check).
 t_stdin_with_asset "Verilog 3005 with wave.vcd" 3005 \
     "$SRC_VERILOG_WAVE" "$STDIN_VERILOG_WAVE" "$EXPECTED" "wave.vcd"
+
+# CircuitRun: stdin is the testcase payload; source_code is the Arduino sketch.
+# The runner prints CIRCUITRUN_EVALUATE_ACCEPTED only after CircuitRun has
+# compiled, simulated, verified behavior, and written requested artifacts.
+t_stdin_with_asset "CircuitRun Arduino Uno Arduino C++ (3009)" 3009 \
+    "$SRC_CIRCUITRUN_ARDUINO" "$STDIN_CIRCUITRUN_ARDUINO" \
+    "CIRCUITRUN_EVALUATE_ACCEPTED" "result.json" 256000
 
 # Archived languages are intentionally not tested here — the smoke test
 # verifies the *currently active* surface. See db/languages/archived.rb
