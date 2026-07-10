@@ -1,4 +1,11 @@
 class SubmissionsController < ApplicationController
+  include SubmissionAuthentication
+
+  # Auth + per-user rate limit run first, before the check_* filters, so an
+  # unauthenticated or throttled request is rejected before any queue work.
+  before_action :authenticate_submission_request, only: [:create, :batch_create, :show, :batch_show]
+  before_action :enforce_submission_rate_limit, only: [:create, :batch_create]
+
   before_action :authorize_request, only: [:index, :destroy]
   before_action :check_maintenance, only: [:create, :destroy]
   before_action :check_wait, only: [:create] # Wait in batch_create is not allowed
