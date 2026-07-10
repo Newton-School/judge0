@@ -1,12 +1,11 @@
 # In-memory TTL cache: positive/negative results cached (never transient), bounded, thread-safe.
 class CachingTokenValidator
-  MAX_ENTRIES = 50_000
-
-  def initialize(inner, ttl_seconds:, negative_ttl_seconds:,
+  def initialize(inner_validator, ttl_seconds:, negative_ttl_seconds:, max_entries:,
                  clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
-    @inner = inner
+    @inner_validator = inner_validator
     @ttl = ttl_seconds.to_i
     @negative_ttl = negative_ttl_seconds.to_i
+    @max_entries = max_entries.to_i
     @clock = clock
     @entries = {}
     @mutex = Mutex.new
@@ -20,12 +19,12 @@ class CachingTokenValidator
       return entry[:value] if entry && now < entry[:expires_at]
     end
 
-    value = @inner.validate(token) # may raise TransientError — intentionally not cached
+    value = @inner_validator.validate(token) # may raise TransientError — intentionally not cached
 
     ttl = value == :invalid ? @negative_ttl : @ttl
     @mutex.synchronize do
-      purge_expired(now) if @entries.size >= MAX_ENTRIES
-      @entries[token] = { value: value, expires_at: now + ttl } if @entries.size < MAX_ENTRIES
+      purge_expired(now) if @entries.size >= @max_entries
+      @entries[token] = { value: value, expires_at: now + ttl } if @entries.size < @max_entries
     end
     value
   end

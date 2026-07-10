@@ -14,7 +14,8 @@ module SubmissionAuthentication
         @token_validator ||= CachingTokenValidator.new(
           NewtonTokenValidator.new(Rails.application.secrets.judge0_auth_validate_url),
           ttl_seconds: Rails.application.secrets.auth_cache_ttl_seconds.to_i,
-          negative_ttl_seconds: 5
+          negative_ttl_seconds: 5,
+          max_entries: Rails.application.secrets.auth_cache_max_entries.to_i
         )
       end
     end
@@ -40,17 +41,17 @@ module SubmissionAuthentication
       return
     end
 
-    result =
+    validation_result =
       begin
         SubmissionAuthentication.token_validator.validate(token)
       rescue NewtonTokenValidator::TransientError
         return render_auth_error(503, "Auth temporarily unavailable")
       end
 
-    return render_auth_error(403, "Invalid token") if result == :invalid
+    return render_auth_error(403, "Invalid token") if validation_result == :invalid
 
     @is_service_caller = false
-    @current_user_id = result
+    @current_user_id = validation_result
   end
 
   def enforce_submission_rate_limit
@@ -67,15 +68,15 @@ module SubmissionAuthentication
   end
 
   def bearer_token
-    header = request.headers["Authorization"].to_s.strip
-    return nil unless header.downcase.start_with?("bearer ")
-    header[7..-1].to_s.strip
+    auth_header = request.headers["Authorization"].to_s.strip
+    return nil unless auth_header.downcase.start_with?("bearer ")
+    auth_header[7..-1].to_s.strip
   end
 
   def service_token?(token)
-    secret = Rails.application.secrets.submission_service_token.to_s
-    return false if secret.empty?
-    ActiveSupport::SecurityUtils.secure_compare(token, secret)
+    service_secret = Rails.application.secrets.submission_service_token.to_s
+    return false if service_secret.empty?
+    ActiveSupport::SecurityUtils.secure_compare(token, service_secret)
   end
 
   def render_auth_error(status, message)

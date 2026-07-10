@@ -13,28 +13,28 @@ class NewtonTokenValidator
   # Returns user id, :invalid (401/403), or raises TransientError (caller fails closed).
   def validate(token)
     uri = URI.parse(@validate_url)
-    req = Net::HTTP::Get.new(uri)
-    req["Authorization"] = "Bearer #{token}"
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{token}"
 
-    resp = Net::HTTP.start(
+    response = Net::HTTP.start(
       uri.host, uri.port,
       use_ssl: uri.scheme == "https", open_timeout: 3, read_timeout: 3
-    ) { |http| http.request(req) }
+    ) { |http| http.request(request) }
 
-    case resp.code.to_i
+    case response.code.to_i
     when 200
-      user_id = JSON.parse(resp.body)["user_id"]
+      user_id = JSON.parse(response.body)["user_id"]
       raise TransientError, "empty user_id" if user_id.nil? || user_id.to_s.empty?
       user_id.to_s
     when 401, 403
       :invalid
     else
-      raise TransientError, "unexpected status #{resp.code}"
+      raise TransientError, "unexpected status #{response.code}"
     end
   rescue TransientError
     raise
-  rescue StandardError => e
+  rescue StandardError => error
     # Any network/TLS/parse failure is transient → fail closed (503), never a 500.
-    raise TransientError, e.message
+    raise TransientError, error.message
   end
 end
