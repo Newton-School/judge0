@@ -4,6 +4,13 @@ RSpec.describe SubmissionsController, type: :controller do
 
   let(:submission) { create(:submission) }
 
+  # Submission endpoints now require a bearer; authenticate every example as the
+  # trusted service caller so these pre-existing behaviour tests are unaffected.
+  before do
+    allow(Rails.application.secrets).to receive(:submission_service_token).and_return("svc-secret")
+    request.headers["Authorization"] = "Bearer svc-secret"
+  end
+
   describe "GET #show" do
     it "returns one submission" do
       get :show, params: { token: submission.token }
