@@ -1,7 +1,8 @@
 require 'active_support/security_utils'
+require 'ipaddr'
 
-# Submission auth + per-user rate limit (NS-13252): service secret bypasses the
-# limit, other tokens validate against newton-api. Auth fails closed; limiting fails open.
+# Submission auth + rate limit (NS-13252): service secret bypasses; valid token -> per-user id,
+# no token -> anonymous per-IP; reads are IP-limited. Auth fails closed on invalid token; limiting fails open.
 module SubmissionAuthentication
   extend ActiveSupport::Concern
 
@@ -36,7 +37,7 @@ module SubmissionAuthentication
     if token.nil? || token.empty?
       @is_service_caller = false
       @is_anonymous = true
-      @client_ip = request.remote_ip
+      @client_ip = normalized_ip(request.remote_ip)
       return
     end
 
@@ -83,7 +84,7 @@ module SubmissionAuthentication
     return if @is_service_caller
 
     begin
-      key = "r:#{request.remote_ip}"
+      key = "r:#{normalized_ip(request.remote_ip)}"
       limit = Rails.application.secrets.read_rate_limit_per_minute.to_i
       unless SubmissionAuthentication.rate_limiter.allow?(key, limit)
         render json: { error: "Rate limit exceeded" }, status: 429
@@ -97,6 +98,14 @@ module SubmissionAuthentication
     auth_header = request.headers["Authorization"].to_s.strip
     return nil unless auth_header.downcase.start_with?("bearer ")
     auth_header[7..-1].to_s.strip
+  end
+
+  # Group IPv6 by /64 (matches pyro's client_ip normalization); IPv4 stays exact.
+  def normalized_ip(ip)
+    addr = IPAddr.new(ip.to_s)
+    addr.ipv6? ? "#{addr.mask(64)}/64" : ip.to_s
+  rescue IPAddr::InvalidAddressError
+    ip.to_s
   end
 
   def service_token?(token)
