@@ -2,7 +2,7 @@ require 'active_support/security_utils'
 require 'ipaddr'
 
 # Submission auth + rate limit (NS-13252): service secret bypasses; valid token -> per-user id,
-# no token -> anonymous per-IP; reads are IP-limited. Auth fails closed on invalid token; limiting fails open.
+# no token -> anonymous per-IP; reads are IP-limited. Auth and the limiter both fail closed (limiter error -> 503).
 module SubmissionAuthentication
   extend ActiveSupport::Concern
 
@@ -76,7 +76,8 @@ module SubmissionAuthentication
         render json: { error: "Rate limit exceeded" }, status: 429
       end
     rescue StandardError
-      # Fail open: a Redis blip (or limiter build failure) must not block submissions.
+      # Fail closed: a limiter/Redis failure returns a generic 503, not free passage.
+      render json: { error: "Service temporarily unavailable" }, status: 503
     end
   end
 
@@ -90,7 +91,8 @@ module SubmissionAuthentication
         render json: { error: "Rate limit exceeded" }, status: 429
       end
     rescue StandardError
-      # Fail open.
+      # Fail closed: a limiter/Redis failure returns a generic 503, not free passage.
+      render json: { error: "Service temporarily unavailable" }, status: 503
     end
   end
 
