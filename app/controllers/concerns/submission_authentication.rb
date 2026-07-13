@@ -23,8 +23,7 @@ module SubmissionAuthentication
     def rate_limiter
       @rate_limiter || SINGLETON_MUTEX.synchronize do
         @rate_limiter ||= SubmissionRateLimiter.new(
-          Rails.application.secrets.rate_limit_redis_url,
-          Rails.application.secrets.submission_rate_limit_per_minute
+          Rails.application.secrets.rate_limit_redis_url
         )
       end
     end
@@ -34,7 +33,12 @@ module SubmissionAuthentication
 
   def authenticate_submission_request
     token = bearer_token
-    return render_auth_error(401, "Unauthorized") if token.nil? || token.empty?
+    if token.nil? || token.empty?
+      @is_service_caller = false
+      @is_anonymous = true
+      @client_ip = request.remote_ip
+      return
+    end
 
     if service_token?(token)
       @is_service_caller = true
@@ -51,19 +55,41 @@ module SubmissionAuthentication
     return render_auth_error(403, "Invalid token") if validation_result == :invalid
 
     @is_service_caller = false
+    @is_anonymous = false
     @current_user_id = validation_result
   end
 
   def enforce_submission_rate_limit
     return if @is_service_caller
-    return if @current_user_id.nil?
 
     begin
-      unless SubmissionAuthentication.rate_limiter.allow?(@current_user_id)
+      if @is_anonymous
+        key = "ip:#{@client_ip}"
+        limit = Rails.application.secrets.anon_submission_rate_limit_per_minute.to_i
+      else
+        return if @current_user_id.nil?
+        key = "u:#{@current_user_id}"
+        limit = Rails.application.secrets.submission_rate_limit_per_minute.to_i
+      end
+      unless SubmissionAuthentication.rate_limiter.allow?(key, limit)
         render json: { error: "Rate limit exceeded" }, status: 429
       end
     rescue StandardError
       # Fail open: a Redis blip (or limiter build failure) must not block submissions.
+    end
+  end
+
+  def enforce_read_rate_limit
+    return if @is_service_caller
+
+    begin
+      key = "r:#{request.remote_ip}"
+      limit = Rails.application.secrets.read_rate_limit_per_minute.to_i
+      unless SubmissionAuthentication.rate_limiter.allow?(key, limit)
+        render json: { error: "Rate limit exceeded" }, status: 429
+      end
+    rescue StandardError
+      # Fail open.
     end
   end
 

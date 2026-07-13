@@ -1,19 +1,18 @@
 require 'redis'
 
-# Redis fixed-window per-user limiter, global across pods; raises on Redis error (caller fails open).
+# Redis fixed-window per-minute limiter, global across pods; raises on Redis error (caller fails open).
 class SubmissionRateLimiter
-  def initialize(redis_url, per_minute_limit, clock: -> { Time.now.to_i })
+  def initialize(redis_url, clock: -> { Time.now.to_i })
     @redis = Redis.new(url: redis_url)
-    @limit = per_minute_limit.to_i
     @clock = clock
   end
 
-  # true if the key is within its one-minute budget; raises on Redis error (caller fails open).
-  def allow?(key)
+  # true if the key is within the given one-minute budget; raises on Redis error (caller fails open).
+  def allow?(key, limit)
     window = @clock.call / 60
     redis_key = "judge0:rl:#{key}:#{window}"
     count = @redis.incr(redis_key)
     @redis.expire(redis_key, 70) if count == 1
-    count <= @limit
+    count <= limit.to_i
   end
 end

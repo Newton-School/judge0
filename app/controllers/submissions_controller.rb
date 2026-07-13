@@ -5,6 +5,7 @@ class SubmissionsController < ApplicationController
   # unauthenticated or throttled request is rejected before any queue work.
   before_action :authenticate_submission_request, only: [:create, :batch_create, :show, :batch_show]
   before_action :enforce_submission_rate_limit, only: [:create, :batch_create]
+  before_action :enforce_read_rate_limit, only: [:show, :batch_show]
 
   before_action :authorize_request, only: [:index, :destroy]
   before_action :check_maintenance, only: [:create, :destroy]
