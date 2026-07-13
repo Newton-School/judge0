@@ -67,11 +67,11 @@ RSpec.describe "Submission authentication", type: :request do
       expect(response.status).not_to eq(429)
     end
 
-    it "fails open when the limiter raises (Redis down)" do
+    it "fails closed with 503 when the limiter raises (Redis down)" do
       allow(@limiter).to receive(:allow?).and_raise(StandardError.new("redis down"))
       post "/submissions", params: attributes_for(:valid_submission),
                            headers: { "Authorization" => "Bearer user-tok" }
-      expect(response.status).not_to eq(429)
+      expect(response.status).to eq(503)
     end
 
     it "rate-limits an anonymous caller by IP" do
@@ -110,6 +110,12 @@ RSpec.describe "Submission authentication", type: :request do
       expect(@limiter).to receive(:allow?).with("r:203.0.113.9", anything).and_return(false)
       get "/submissions/anytoken", env: { "REMOTE_ADDR" => "203.0.113.9" }
       expect(response.status).to eq(429)
+    end
+
+    it "fails closed with 503 when the read limiter raises" do
+      allow(@limiter).to receive(:allow?).and_raise(StandardError.new("redis down"))
+      get "/submissions/anytoken", env: { "REMOTE_ADDR" => "203.0.113.9" }
+      expect(response.status).to eq(503)
     end
 
     it "does not call the rate limiter for the service caller's read" do
