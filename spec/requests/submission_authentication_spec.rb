@@ -80,6 +80,12 @@ RSpec.describe "Submission authentication", type: :request do
                            env: { "REMOTE_ADDR" => "203.0.113.9" }
     end
 
+    it "groups an anonymous IPv6 caller by /64" do
+      expect(@limiter).to receive(:allow?).with("ip:2001:db8:abcd:1234::/64", anything).and_return(true)
+      post "/submissions", params: attributes_for(:valid_submission),
+                           env: { "REMOTE_ADDR" => "2001:db8:abcd:1234:ffff::1" }
+    end
+
     it "rate-limits a logged-in caller by user id" do
       expect(@limiter).to receive(:allow?).with("u:user-1", anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
@@ -101,8 +107,8 @@ RSpec.describe "Submission authentication", type: :request do
 
   describe "read rate limit" do
     it "429s a read over the per-minute limit" do
-      allow(@limiter).to receive(:allow?).and_return(false)
-      get "/submissions/anytoken"
+      expect(@limiter).to receive(:allow?).with("r:203.0.113.9", anything).and_return(false)
+      get "/submissions/anytoken", env: { "REMOTE_ADDR" => "203.0.113.9" }
       expect(response.status).to eq(429)
     end
 
