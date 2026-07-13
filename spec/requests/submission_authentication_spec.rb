@@ -20,9 +20,9 @@ RSpec.describe "Submission authentication", type: :request do
   end
 
   describe "auth branch" do
-    it "401 without a bearer" do
-      get "/submissions/anytoken"
-      expect(response.status).to eq(401)
+    it "does not 401 an anonymous request without a bearer" do
+      post "/submissions", params: attributes_for(:valid_submission)
+      expect(response.status).not_to eq(401)
     end
 
     it "403 with an invalid bearer" do
@@ -71,6 +71,45 @@ RSpec.describe "Submission authentication", type: :request do
       allow(@limiter).to receive(:allow?).and_raise(StandardError.new("redis down"))
       post "/submissions", params: attributes_for(:valid_submission),
                            headers: { "Authorization" => "Bearer user-tok" }
+      expect(response.status).not_to eq(429)
+    end
+
+    it "rate-limits an anonymous caller by IP" do
+      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything).and_return(true)
+      post "/submissions", params: attributes_for(:valid_submission),
+                           env: { "REMOTE_ADDR" => "203.0.113.9" }
+    end
+
+    it "rate-limits a logged-in caller by user id" do
+      expect(@limiter).to receive(:allow?).with("u:user-1", anything).and_return(true)
+      post "/submissions", params: attributes_for(:valid_submission),
+                           headers: { "Authorization" => "Bearer user-tok" }
+    end
+
+    it "does not call the rate limiter for the service caller" do
+      expect(@limiter).not_to receive(:allow?)
+      post "/submissions", params: attributes_for(:valid_submission),
+                           headers: { "Authorization" => "Bearer #{service_token}" }
+    end
+
+    it "429s an anonymous caller over the per-minute limit" do
+      allow(@limiter).to receive(:allow?).and_return(false)
+      post "/submissions", params: attributes_for(:valid_submission)
+      expect(response.status).to eq(429)
+    end
+  end
+
+  describe "read rate limit" do
+    it "429s a read over the per-minute limit" do
+      allow(@limiter).to receive(:allow?).and_return(false)
+      get "/submissions/anytoken"
+      expect(response.status).to eq(429)
+    end
+
+    it "does not call the rate limiter for the service caller's read" do
+      submission = create(:submission)
+      expect(@limiter).not_to receive(:allow?)
+      get "/submissions/#{submission.token}", headers: { "Authorization" => "Bearer #{service_token}" }
       expect(response.status).not_to eq(429)
     end
   end
