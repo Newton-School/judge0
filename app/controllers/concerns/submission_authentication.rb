@@ -39,7 +39,7 @@ module SubmissionAuthentication
     if token.nil? || token.empty?
       @is_service_caller = false
       @is_anonymous = true
-      @client_ip = normalized_ip(request.remote_ip)
+      @client_ip = normalized_ip(client_ip)
       return
     end
 
@@ -87,7 +87,12 @@ module SubmissionAuthentication
     return if @is_service_caller
 
     begin
-      key = "r:#{normalized_ip(request.remote_ip)}"
+      if @is_anonymous
+        key = "r:#{@client_ip}"
+      else
+        return if @current_user_id.nil?
+        key = "r:u:#{@current_user_id}"
+      end
       limit = Rails.application.secrets.read_rate_limit_per_minute.to_i
       unless SubmissionAuthentication.rate_limiter.allow?(key, limit)
         render json: { error: "Rate limit exceeded" }, status: 429
@@ -102,6 +107,11 @@ module SubmissionAuthentication
     auth_header = request.headers["Authorization"].to_s.strip
     return nil unless auth_header.downcase.start_with?("bearer ")
     auth_header[7..-1].to_s.strip
+  end
+
+  def client_ip
+    forwarded = request.headers["X-Forwarded-For"].to_s.split(",").map(&:strip).reject(&:empty?)
+    forwarded.last || request.remote_ip
   end
 
   # Group IPv6 by /64 (matches pyro's client_ip normalization); IPv4 stays exact.

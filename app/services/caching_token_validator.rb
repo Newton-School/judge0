@@ -38,20 +38,20 @@ class CachingTokenValidator
     @mutex.synchronize do
       @positive.delete(token)
       @negative.delete(token)
-      purge_expired(now)
+      evict_one_expired(now) if @positive.size + @negative.size >= @max_entries
       return if @positive.size + @negative.size >= @max_entries
 
       cache[token] = { value: value, expires_at: now + ttl }
     end
   end
 
-  def purge_expired(now)
+  def evict_one_expired(now)
     [@positive, @negative].each do |cache|
-      while (pair = cache.first)
-        break if now < pair[1][:expires_at]
+      pair = cache.first
+      next unless pair && now >= pair[1][:expires_at]
 
-        cache.shift
-      end
+      cache.shift
+      return
     end
   end
 end
