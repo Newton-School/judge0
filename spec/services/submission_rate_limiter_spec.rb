@@ -10,39 +10,39 @@ RSpec.describe SubmissionRateLimiter do
 
   it "allows a key under its limit" do
     allow(redis).to receive(:incr).and_return(1)
-    limiter = described_class.new("redis://localhost:6379/0")
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil)
     expect(limiter.allow?("k", 3)).to eq(true)
   end
 
   it "blocks a key over its limit" do
     allow(redis).to receive(:incr).and_return(4)
-    limiter = described_class.new("redis://localhost:6379/0")
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil)
     expect(limiter.allow?("k", 3)).to eq(false)
   end
 
   it "sets an expiry only on the first hit in a window" do
     allow(redis).to receive(:incr).and_return(1)
     expect(redis).to receive(:expire).with(a_string_matching(/\Ajudge0:rl:k:\d+\z/), 70)
-    limiter = described_class.new("redis://localhost:6379/0")
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil)
     limiter.allow?("k", 3)
   end
 
   it "does not set an expiry on a later hit in the same window" do
     allow(redis).to receive(:incr).and_return(2)
     expect(redis).not_to receive(:expire)
-    limiter = described_class.new("redis://localhost:6379/0")
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil)
     limiter.allow?("k", 3)
   end
 
-  it "constructs its redis client from the given url" do
-    expect(Redis).to receive(:new).with(url: "redis://example:6379/2").and_return(redis)
+  it "constructs its redis client from host, port, and password" do
+    expect(Redis).to receive(:new).with(host: "example", port: 6379, password: "secret").and_return(redis)
     allow(redis).to receive(:incr).and_return(1)
-    described_class.new("redis://example:6379/2").allow?("k", 3)
+    described_class.new(host: "example", port: 6379, password: "secret").allow?("k", 3)
   end
 
   it "uses the injectable clock to key the window" do
     allow(redis).to receive(:incr).with("judge0:rl:k:0").and_return(1)
-    limiter = described_class.new("redis://localhost:6379/0", clock: -> { 0 })
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil, clock: -> { 0 })
     expect(limiter.allow?("k", 3)).to eq(true)
   end
 
@@ -50,7 +50,7 @@ RSpec.describe SubmissionRateLimiter do
     t = 0
     counts = Hash.new(0)
     allow(redis).to receive(:incr) { |key| counts[key] += 1 }
-    limiter = described_class.new("redis://localhost:6379/0", clock: -> { t })
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil, clock: -> { t })
     expect(limiter.allow?("k", 1)).to eq(true)
     expect(limiter.allow?("k", 1)).to eq(false)
     t += 60
@@ -60,7 +60,7 @@ RSpec.describe SubmissionRateLimiter do
   it "enforces the given per-call limit across five calls" do
     counts = Hash.new(0)
     allow(redis).to receive(:incr) { |key| counts[key] += 1 }
-    limiter = described_class.new("redis://localhost:6379/0", clock: -> { 0 })
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil, clock: -> { 0 })
     results = 5.times.map { limiter.allow?("k", 3) }
     expect(results).to eq([true, true, true, false, false])
   end

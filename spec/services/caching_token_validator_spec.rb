@@ -63,4 +63,15 @@ RSpec.describe CachingTokenValidator do
     cv.validate("b")
     expect(inner.calls).to eq(3)
   end
+
+  it "purges an expired entry to admit a new one at capacity" do
+    inner = CountingValidator.new("u1")
+    t = 1_000_000
+    cv = described_class.new(inner, ttl_seconds: 60, negative_ttl_seconds: 5, max_entries: 1, clock: -> { t })
+    cv.validate("a")
+    t += 120
+    cv.validate("b")
+    cv.validate("b")
+    expect(inner.calls).to eq(2)
+  end
 end
