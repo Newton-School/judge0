@@ -14,7 +14,7 @@ module SubmissionAuthentication
       @token_validator || SINGLETON_MUTEX.synchronize do
         @token_validator ||= CachingTokenValidator.new(
           NewtonTokenValidator.new(Rails.application.secrets.judge0_auth_validate_url),
-          ttl_seconds: Rails.application.secrets.auth_cache_ttl_seconds.to_i,
+          ttl_seconds: Rails.application.secrets.auth_positive_cache_ttl_seconds.to_i,
           negative_ttl_seconds: Rails.application.secrets.auth_negative_cache_ttl_seconds.to_i,
           max_entries: Rails.application.secrets.auth_cache_max_entries.to_i
         )
