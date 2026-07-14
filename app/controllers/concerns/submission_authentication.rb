@@ -15,7 +15,7 @@ module SubmissionAuthentication
         @token_validator ||= CachingTokenValidator.new(
           NewtonTokenValidator.new(Rails.application.secrets.judge0_auth_validate_url),
           ttl_seconds: Rails.application.secrets.auth_cache_ttl_seconds.to_i,
-          negative_ttl_seconds: 5,
+          negative_ttl_seconds: Rails.application.secrets.auth_negative_cache_ttl_seconds.to_i,
           max_entries: Rails.application.secrets.auth_cache_max_entries.to_i
         )
       end
@@ -24,7 +24,9 @@ module SubmissionAuthentication
     def rate_limiter
       @rate_limiter || SINGLETON_MUTEX.synchronize do
         @rate_limiter ||= SubmissionRateLimiter.new(
-          Rails.application.secrets.rate_limit_redis_url
+          host: ENV["REDIS_HOST"],
+          port: ENV["REDIS_PORT"],
+          password: ENV["REDIS_PASSWORD"]
         )
       end
     end

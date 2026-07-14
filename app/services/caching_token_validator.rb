@@ -7,7 +7,8 @@ class CachingTokenValidator
     @negative_ttl = negative_ttl_seconds.to_i
     @max_entries = max_entries.to_i
     @clock = clock
-    @entries = {}
+    @positive = {}
+    @negative = {}
     @mutex = Mutex.new
   end
 
@@ -15,23 +16,42 @@ class CachingTokenValidator
   def validate(token)
     now = @clock.call
     @mutex.synchronize do
-      entry = @entries[token]
+      entry = @positive[token] || @negative[token]
       return entry[:value] if entry && now < entry[:expires_at]
     end
 
     value = @inner_validator.validate(token) # may raise TransientError — intentionally not cached
 
-    ttl = value == :invalid ? @negative_ttl : @ttl
-    @mutex.synchronize do
-      purge_expired(now) if @entries.size >= @max_entries
-      @entries[token] = { value: value, expires_at: now + ttl } if @entries.size < @max_entries
-    end
+    store(now, token, value)
     value
   end
 
   private
 
+  def store(now, token, value)
+    if value == :invalid
+      cache, ttl = @negative, @negative_ttl
+    else
+      cache, ttl = @positive, @ttl
+    end
+
+    @mutex.synchronize do
+      @positive.delete(token)
+      @negative.delete(token)
+      purge_expired(now)
+      return if @positive.size + @negative.size >= @max_entries
+
+      cache[token] = { value: value, expires_at: now + ttl }
+    end
+  end
+
   def purge_expired(now)
-    @entries.delete_if { |_token, entry| now >= entry[:expires_at] }
+    [@positive, @negative].each do |cache|
+      while (pair = cache.first)
+        break if now < pair[1][:expires_at]
+
+        cache.shift
+      end
+    end
   end
 end
