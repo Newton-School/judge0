@@ -80,6 +80,12 @@ RSpec.describe "Submission authentication", type: :request do
                            env: { "REMOTE_ADDR" => "203.0.113.9" }
     end
 
+    it "takes the client IP from the last X-Forwarded-For entry" do
+      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything).and_return(true)
+      post "/submissions", params: attributes_for(:valid_submission),
+                           env: { "HTTP_X_FORWARDED_FOR" => "1.1.1.1, 203.0.113.9" }
+    end
+
     it "groups an anonymous IPv6 caller by /64" do
       expect(@limiter).to receive(:allow?).with("ip:2001:db8:abcd:1234::/64", anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
@@ -110,6 +116,11 @@ RSpec.describe "Submission authentication", type: :request do
       expect(@limiter).to receive(:allow?).with("r:203.0.113.9", anything).and_return(false)
       get "/submissions/anytoken", env: { "REMOTE_ADDR" => "203.0.113.9" }
       expect(response.status).to eq(429)
+    end
+
+    it "keys a signed-in read by user id" do
+      expect(@limiter).to receive(:allow?).with("r:u:user-1", anything).and_return(true)
+      get "/submissions/anytoken", headers: { "Authorization" => "Bearer user-tok" }
     end
 
     it "fails closed with 503 when the read limiter raises" do
