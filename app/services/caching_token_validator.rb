@@ -1,3 +1,5 @@
+require "digest"
+
 # In-memory TTL cache: positive/negative results cached (never transient), bounded, thread-safe.
 class CachingTokenValidator
   def initialize(inner_validator, ttl_seconds:, negative_ttl_seconds:, max_entries:,
@@ -15,28 +17,34 @@ class CachingTokenValidator
   # Returns a user id String or :invalid; raises on transient (not cached).
   def validate(token)
     now = @clock.call
+    key = digest(token)
     @mutex.synchronize do
-      entry = @positive[token] || @negative[token]
+      entry = @positive[key] || @negative[key]
       return entry[:value] if entry && now < entry[:expires_at]
     end
 
     value = @inner_validator.validate(token) # may raise TransientError — intentionally not cached
 
-    store(now, token, value)
+    store(now, key, value)
     value
   end
 
   def cached?(token)
     now = @clock.call
+    key = digest(token)
     @mutex.synchronize do
-      entry = @positive[token] || @negative[token]
+      entry = @positive[key] || @negative[key]
       !entry.nil? && now < entry[:expires_at]
     end
   end
 
   private
 
-  def store(now, token, value)
+  def digest(token)
+    Digest::SHA256.hexdigest(token)
+  end
+
+  def store(now, key, value)
     if value == :invalid
       cache, ttl = @negative, @negative_ttl
     else
@@ -44,12 +52,12 @@ class CachingTokenValidator
     end
 
     @mutex.synchronize do
-      @positive.delete(token)
-      @negative.delete(token)
+      @positive.delete(key)
+      @negative.delete(key)
       evict_one_expired(now) if @positive.size + @negative.size >= @max_entries
       return if @positive.size + @negative.size >= @max_entries
 
-      cache[token] = { value: value, expires_at: now + ttl }
+      cache[key] = { value: value, expires_at: now + ttl }
     end
   end
 
