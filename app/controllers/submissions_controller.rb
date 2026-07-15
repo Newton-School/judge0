@@ -1,4 +1,11 @@
 class SubmissionsController < ApplicationController
+  include SubmissionAuthentication
+
+  # Authenticate, then rate-limit: per-user or per-IP on create/batch_create, per-IP on show/batch_show.
+  before_action :authenticate_submission_request, only: [:create, :batch_create, :show, :batch_show]
+  before_action :enforce_submission_rate_limit, only: [:create, :batch_create]
+  before_action :enforce_read_rate_limit, only: [:show, :batch_show]
+
   before_action :authorize_request, only: [:index, :destroy]
   before_action :check_maintenance, only: [:create, :destroy]
   before_action :check_wait, only: [:create] # Wait in batch_create is not allowed
