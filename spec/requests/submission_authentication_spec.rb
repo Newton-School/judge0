@@ -12,6 +12,7 @@ RSpec.describe "Submission authentication", type: :request do
     @validator = instance_double(CachingTokenValidator)
     allow(@validator).to receive(:validate).with("user-tok").and_return("user-1")
     allow(@validator).to receive(:validate).with("bad-tok").and_return(:invalid)
+    allow(@validator).to receive(:cached?).and_return(true)
     allow(SubmissionAuthentication).to receive(:token_validator).and_return(@validator)
 
     @limiter = instance_double(SubmissionRateLimiter)
@@ -75,27 +76,45 @@ RSpec.describe "Submission authentication", type: :request do
     end
 
     it "rate-limits an anonymous caller by IP" do
-      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything).and_return(true)
+      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything, anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
                            env: { "REMOTE_ADDR" => "203.0.113.9" }
     end
 
     it "takes the client IP from the last X-Forwarded-For entry" do
-      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything).and_return(true)
+      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything, anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
                            env: { "HTTP_X_FORWARDED_FOR" => "1.1.1.1, 203.0.113.9" }
     end
 
     it "groups an anonymous IPv6 caller by /64" do
-      expect(@limiter).to receive(:allow?).with("ip:2001:db8:abcd:1234::/64", anything).and_return(true)
+      expect(@limiter).to receive(:allow?).with("ip:2001:db8:abcd:1234::/64", anything, anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
                            env: { "REMOTE_ADDR" => "2001:db8:abcd:1234:ffff::1" }
     end
 
     it "rate-limits a logged-in caller by user id" do
-      expect(@limiter).to receive(:allow?).with("u:user-1", anything).and_return(true)
+      expect(@limiter).to receive(:allow?).with("u:user-1", anything, anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
                            headers: { "Authorization" => "Bearer user-tok" }
+    end
+
+    it "charges the batch size against the rate limit" do
+      expect(@limiter).to receive(:allow?).with("ip:203.0.113.9", anything, 3).and_return(true)
+      post "/submissions/batch",
+           params: { submissions: [attributes_for(:valid_submission),
+                                   attributes_for(:valid_submission),
+                                   attributes_for(:valid_submission)] },
+           env: { "REMOTE_ADDR" => "203.0.113.9" }
+    end
+
+    it "throttles a cache-miss validation by IP and fails closed over the limit" do
+      allow(@validator).to receive(:cached?).and_return(false)
+      expect(@limiter).to receive(:allow?).with("auth:203.0.113.9", anything).and_return(false)
+      post "/submissions", params: attributes_for(:valid_submission),
+                           env: { "REMOTE_ADDR" => "203.0.113.9" },
+                           headers: { "Authorization" => "Bearer user-tok" }
+      expect(response.status).to eq(503)
     end
 
     it "does not call the rate limiter for the service caller" do

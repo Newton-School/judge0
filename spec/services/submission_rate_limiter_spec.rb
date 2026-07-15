@@ -64,4 +64,18 @@ RSpec.describe SubmissionRateLimiter do
     results = 5.times.map { limiter.allow?("k", 3) }
     expect(results).to eq([true, true, true, false, false])
   end
+
+  it "charges the given amount via incrby and blocks once the budget is exceeded" do
+    counts = Hash.new(0)
+    allow(redis).to receive(:incrby) { |key, amount| counts[key] += amount }
+    limiter = described_class.new(host: "localhost", port: 6379, password: nil, clock: -> { 0 })
+    expect(limiter.allow?("k", 10, 6)).to eq(true)   # 6 <= 10
+    expect(limiter.allow?("k", 10, 6)).to eq(false)  # 12 > 10
+  end
+
+  it "sets an expiry on the first amounted hit in a window" do
+    allow(redis).to receive(:incrby).and_return(6)
+    expect(redis).to receive(:expire).with(a_string_matching(/\Ajudge0:rl:k:\d+\z/), 70)
+    described_class.new(host: "localhost", port: 6379, password: nil).allow?("k", 10, 6)
+  end
 end
