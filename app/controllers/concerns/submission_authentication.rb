@@ -36,16 +36,26 @@ module SubmissionAuthentication
 
   def authenticate_submission_request
     token = bearer_token
+    @client_ip = normalized_ip(client_ip)
+
     if token.nil? || token.empty?
       @is_service_caller = false
       @is_anonymous = true
-      @client_ip = normalized_ip(client_ip)
       return
     end
 
     if service_token?(token)
       @is_service_caller = true
       return
+    end
+
+    unless SubmissionAuthentication.token_validator.cached?(token)
+      begin
+        limit = Rails.application.secrets.anon_submission_rate_limit_per_minute.to_i
+        return render_auth_error(503, "Auth temporarily unavailable") unless SubmissionAuthentication.rate_limiter.allow?("auth:#{@client_ip}", limit)
+      rescue StandardError
+        return render_auth_error(503, "Auth temporarily unavailable")
+      end
     end
 
     validation_result =
@@ -74,7 +84,7 @@ module SubmissionAuthentication
         key = "u:#{@current_user_id}"
         limit = Rails.application.secrets.submission_rate_limit_per_minute.to_i
       end
-      unless SubmissionAuthentication.rate_limiter.allow?(key, limit)
+      unless SubmissionAuthentication.rate_limiter.allow?(key, limit, submission_cost)
         render json: { error: "Rate limit exceeded" }, status: 429
       end
     rescue StandardError
@@ -109,6 +119,11 @@ module SubmissionAuthentication
     auth_header[7..-1].to_s.strip
   end
 
+  def submission_cost
+    size = params[:submissions].respond_to?(:size) ? params[:submissions].size : 1
+    [[size, 1].max, Config::MAX_SUBMISSION_BATCH_SIZE].min
+  end
+
   def client_ip
     forwarded = request.headers["X-Forwarded-For"].to_s.split(",").map(&:strip).reject(&:empty?)
     forwarded.last || request.remote_ip
@@ -117,7 +132,8 @@ module SubmissionAuthentication
   # Group IPv6 by /64 (matches pyro's client_ip normalization); IPv4 stays exact.
   def normalized_ip(ip)
     addr = IPAddr.new(ip.to_s)
-    addr.ipv6? ? "#{addr.mask(64)}/64" : ip.to_s
+    addr = addr.native if addr.ipv4_mapped?
+    addr.ipv6? ? "#{addr.mask(64)}/64" : addr.to_s
   rescue IPAddr::InvalidAddressError
     ip.to_s
   end

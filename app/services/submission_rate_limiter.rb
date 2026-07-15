@@ -8,11 +8,11 @@ class SubmissionRateLimiter
   end
 
   # true if the key is within the given one-minute budget; raises on Redis error.
-  def allow?(key, limit)
+  def allow?(key, limit, amount = 1)
     window = @clock.call / 60
     redis_key = "judge0:rl:#{key}:#{window}"
-    count = @redis.incr(redis_key)
-    @redis.expire(redis_key, 70) if count == 1
+    count = amount == 1 ? @redis.incr(redis_key) : @redis.incrby(redis_key, amount)
+    @redis.expire(redis_key, 70) if count == amount
     count <= limit.to_i
   end
 end

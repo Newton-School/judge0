@@ -26,6 +26,14 @@ class CachingTokenValidator
     value
   end
 
+  def cached?(token)
+    now = @clock.call
+    @mutex.synchronize do
+      entry = @positive[token] || @negative[token]
+      !entry.nil? && now < entry[:expires_at]
+    end
+  end
+
   private
 
   def store(now, token, value)
