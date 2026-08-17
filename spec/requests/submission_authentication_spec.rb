@@ -108,13 +108,16 @@ RSpec.describe "Submission authentication", type: :request do
            env: { "REMOTE_ADDR" => "203.0.113.9" }
     end
 
-    it "throttles a cache-miss validation by IP and fails closed over the limit" do
+    it "validates an uncached token directly, with no pre-validation rate gate" do
+      # Matches judge-pyro: the cache absorbs repeats; an uncached token just validates.
+      # The only limiter call on this POST is the (post-auth) per-user submission limit.
       allow(@validator).to receive(:cached?).and_return(false)
-      expect(@limiter).to receive(:allow?).with("auth:203.0.113.9", anything).and_return(false)
+      expect(@limiter).to receive(:allow?).with("u:user-1", anything, anything).and_return(true)
       post "/submissions", params: attributes_for(:valid_submission),
                            env: { "REMOTE_ADDR" => "203.0.113.9" },
                            headers: { "Authorization" => "Bearer user-tok" }
-      expect(response.status).to eq(503)
+      expect(response.status).not_to eq(403)
+      expect(response.status).not_to eq(503)
     end
 
     it "does not call the rate limiter for the service caller" do
@@ -140,6 +143,20 @@ RSpec.describe "Submission authentication", type: :request do
     it "keys a signed-in read by user id" do
       expect(@limiter).to receive(:allow?).with("r:u:user-1", anything).and_return(true)
       get "/submissions/anytoken", headers: { "Authorization" => "Bearer user-tok" }
+    end
+
+    it "limits a signed-in read with the per-user read limit" do
+      allow(Rails.application.secrets).to receive(:read_rate_limit_per_minute).and_return(60)
+      allow(Rails.application.secrets).to receive(:anon_read_rate_limit_per_minute).and_return(300)
+      expect(@limiter).to receive(:allow?).with("r:u:user-1", 60).and_return(true)
+      get "/submissions/anytoken", headers: { "Authorization" => "Bearer user-tok" }
+    end
+
+    it "limits an anonymous read with the separate (more generous) anon read limit" do
+      allow(Rails.application.secrets).to receive(:read_rate_limit_per_minute).and_return(60)
+      allow(Rails.application.secrets).to receive(:anon_read_rate_limit_per_minute).and_return(300)
+      expect(@limiter).to receive(:allow?).with("r:203.0.113.9", 300).and_return(true)
+      get "/submissions/anytoken", env: { "REMOTE_ADDR" => "203.0.113.9" }
     end
 
     it "fails closed with 503 when the read limiter raises" do
