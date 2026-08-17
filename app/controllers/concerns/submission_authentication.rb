@@ -2,7 +2,11 @@ require 'active_support/security_utils'
 require 'ipaddr'
 
 # Submission auth + rate limit (NS-13252): service secret bypasses; valid token -> per-user id,
-# no token -> anonymous per-IP; reads are IP-limited. Auth and the limiter both fail closed (limiter error -> 503).
+# no token -> anonymous per-IP. Submissions and reads are limited per user (logged-in) or per IP
+# (anonymous). A validation cache (positive + negative TTL) absorbs repeat lookups; uncached
+# validations hit newton-api directly, with no separate per-request gate (matching judge-pyro) —
+# an earlier per-IP gate collapsed a whole exam-centre NAT into one validation budget and 503'd
+# the room. The limiter fails closed (limiter error -> 503).
 module SubmissionAuthentication
   extend ActiveSupport::Concern
 
@@ -49,15 +53,6 @@ module SubmissionAuthentication
       return
     end
 
-    unless SubmissionAuthentication.token_validator.cached?(token)
-      begin
-        limit = Rails.application.secrets.anon_submission_rate_limit_per_minute.to_i
-        return render_auth_error(503, "Auth temporarily unavailable") unless SubmissionAuthentication.rate_limiter.allow?("auth:#{@client_ip}", limit)
-      rescue StandardError
-        return render_auth_error(503, "Auth temporarily unavailable")
-      end
-    end
-
     validation_result =
       begin
         SubmissionAuthentication.token_validator.validate(token)
@@ -99,11 +94,14 @@ module SubmissionAuthentication
     begin
       if @is_anonymous
         key = "r:#{@client_ip}"
+        # Anonymous reads share a per-IP bucket, so a NAT egress funnels many pollers through one
+        # key; give it its own (more generous) limit than a single logged-in user's bucket.
+        limit = Rails.application.secrets.anon_read_rate_limit_per_minute.to_i
       else
         return if @current_user_id.nil?
         key = "r:u:#{@current_user_id}"
+        limit = Rails.application.secrets.read_rate_limit_per_minute.to_i
       end
-      limit = Rails.application.secrets.read_rate_limit_per_minute.to_i
       unless SubmissionAuthentication.rate_limiter.allow?(key, limit)
         render json: { error: "Rate limit exceeded" }, status: 429
       end
