@@ -62,11 +62,16 @@ class SubmissionsController < ApplicationController
     render json: submission, base64_encoded: true, fields: @requested_fields
   end
 
+  # A cache entry is the serialized body, keyed per (token, fields, base64), so
+  # it never carries columns the response doesn't return — caching whole rows
+  # let multi-MB stdin blobs OOM the redis sidecar.
   def show
     token = params[:token]
-    render json: Rails.cache.fetch("#{token}", expires_in: Config::SUBMISSION_CACHE_DURATION, race_condition_ttl: 0.1*Config::SUBMISSION_CACHE_DURATION) {
-      Submission.find_by!(token: token)
-    }, base64_encoded: @base64_encoded, fields: @requested_fields
+    ttl = Config::SUBMISSION_CACHE_DURATION
+
+    render json: Rails.cache.fetch(submission_cache_key(token), expires_in: ttl, race_condition_ttl: 0.1*ttl) {
+      serialized_submission(token)
+    }
   rescue Encoding::UndefinedConversionError
     render_conversion_error(:bad_request)
   end
@@ -163,6 +168,18 @@ class SubmissionsController < ApplicationController
   end
 
   private
+
+  def serialized_submission(token)
+    submission = Submission.find_by!(token: token)
+    ActiveModelSerializers::SerializableResource.new(
+      submission, { serializer: SubmissionSerializer, base64_encoded: @base64_encoded, fields: @requested_fields }
+    ).to_json
+  end
+
+  def submission_cache_key(token)
+    fields_digest = Digest::MD5.hexdigest(@requested_fields.map(&:to_s).sort.join(","))
+    "submission:#{token}:#{fields_digest}:b64=#{@base64_encoded ? 1 : 0}"
+  end
 
   def submission_params(params)
     submission_params = params.permit(

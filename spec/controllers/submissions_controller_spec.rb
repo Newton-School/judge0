@@ -26,6 +26,43 @@ RSpec.describe SubmissionsController, type: :controller do
     end
   end
 
+  describe "GET #show caching" do
+    let(:memory_store) { ActiveSupport::Cache::MemoryStore.new }
+
+    before { allow(Rails).to receive(:cache).and_return(memory_store) }
+
+    it "caches the serialized body under a per-field-set key" do
+      get :show, params: { token: submission.token, fields: "status" }
+      cached = memory_store.read(controller.send(:submission_cache_key, submission.token))
+
+      expect(cached).to eq(response.body)
+      expect(cached).not_to include("stdin")
+    end
+
+    it "keys entries per requested field set instead of overwriting one entry" do
+      get :show, params: { token: submission.token, fields: "status" }
+      status_key = controller.send(:submission_cache_key, submission.token)
+
+      get :show, params: { token: submission.token, fields: "status,time" }
+      status_time_key = controller.send(:submission_cache_key, submission.token)
+
+      expect(status_key).not_to eq(status_time_key)
+      expect(memory_store.read(status_key)).to be_present
+      expect(memory_store.read(status_time_key)).to be_present
+    end
+
+    it "serves a repeated identical request from the cache without a DB lookup" do
+      get :show, params: { token: submission.token }
+      first_body = response.body
+
+      expect(Submission).not_to receive(:find_by!)
+      get :show, params: { token: submission.token }
+
+      expect(response.body).to eq(first_body)
+    end
+
+  end
+
   describe "POST #create" do
     context "with valid params" do
       it "creates a new Submission" do

@@ -1,4 +1,5 @@
 require 'active_support/core_ext/numeric/bytes'
+require_relative '../../lib/newton_redis_cache_store'
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -44,12 +45,12 @@ Rails.application.configure do
   config.log_tags = [ :request_id ]
 
   # Use a different cache store in production.
-  config.cache_store = :redis_cache_store, { url: ENV["REDIS_SIDECAR_SERVER"],
+  config.cache_store = NewtonRedisCacheStore.new(url: ENV["REDIS_SIDECAR_SERVER"],
       error_handler: -> (method:, returning:, exception:) {
         # Report errors to Sentry as warnings
         puts "redis_exception - #{exception}"
       }
-}
+)
 
 
   # Use a real queuing backend for Active Job (and separate queues per environment)
