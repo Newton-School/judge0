@@ -1,39 +1,17 @@
 name: Trigger Staging Build
 
 on:
-  push:
-    branches: ["**"]
   workflow_dispatch:
 
 concurrency:
-  group: build-staging-${{ github.ref }}
+  group: build-staging
   cancel-in-progress: true
 
 env:
   ECR_REPOSITORY: judge0
 
 jobs:
-  guard:
-    runs-on: monkci-ubuntu-24.04-4
-    outputs:
-      proceed: ${{ steps.check.outputs.proceed }}
-    steps:
-      - name: Decide whether this push should build
-        id: check
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          elif printf '%s' "${{ github.event.head_commit.message }}" | grep -qF '[BUILD]'; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-          fi
-
   build:
-    needs: guard
-    if: needs.guard.outputs.proceed == 'true'
     runs-on: monkci-ubuntu-24.04-4
     timeout-minutes: 60
     steps:
