@@ -7,9 +7,6 @@ concurrency:
   group: build-staging
   cancel-in-progress: true
 
-env:
-  ECR_REPOSITORY: judge0
-
 jobs:
   build:
     runs-on: monkci-ubuntu-24.04-4
@@ -44,12 +41,12 @@ jobs:
           target: production
           push: true
           platforms: linux/amd64
-          cache-from: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache
-          cache-to: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/judge0:buildcache
+          cache-to: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/judge0:buildcache,mode=max
           tags: |
-            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tags.outputs.sha }}
-            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ steps.ecr-login.outputs.registry }}/judge0:${{ steps.tags.outputs.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/judge0:latest
 
       - name: Summary
         run: |
-          echo "Pushed \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`${{ steps.ecr-login.outputs.registry }}/judge0:${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
