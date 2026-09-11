@@ -1,4 +1,4 @@
-name: Build & push → staging ECR
+name: Trigger Staging Build
 
 # Builds the NewtonDockerfile "production" image and pushes it to the
 # staging ECR registry (account 552623333554, ap-south-1). This does NOT
