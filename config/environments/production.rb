@@ -37,9 +37,17 @@ Rails.application.configure do
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
   # config.force_ssl = true
 
-  # Use the lowest log level to ensure availability of diagnostic information
-  # when problems arise.
-  config.log_level = :debug
+  # Log level, per deployment via RAILS_LOG_LEVEL (debug, info, warn, error,
+  # fatal). Default :warn, as in upstream judge0. At :info Rails logs every
+  # request's Parameters line, which for submissions carries the full base64
+  # source_code, stdin and expected_output; at :debug every SQL statement as
+  # well. With RAILS_LOG_TO_STDOUT unset that grows log/production.log by
+  # several GB/hour under exam load (2026-09-10 prod DiskPressure evictions).
+  log_level = ENV.fetch("RAILS_LOG_LEVEL", "warn").strip.downcase
+  unless %w[debug info warn error fatal unknown].include?(log_level)
+    raise ArgumentError, "RAILS_LOG_LEVEL=#{log_level.inspect} is not a valid Rails log level"
+  end
+  config.log_level = log_level.to_sym
 
   # Prepend all log lines with the following tags.
   config.log_tags = [ :request_id ]
