@@ -1,0 +1,103 @@
+name: Build & push → production ECR
+
+# Production ECR pushes are MANUAL ONLY. Two safety gates (mirrors
+# newton-marketing-web's deploy-prod.yml):
+#   1. The 'production' GitHub Environment requires a human reviewer to
+#      approve every run (configure in repo settings → Environments).
+#   2. The user must type "build" in the workflow_dispatch input as a
+#      typo-prevention step.
+#
+# This only builds & pushes the image to ECR (account 405612465938,
+# ap-south-1) — it does NOT roll it out. Deploying still means bumping the
+# tag in kubernetes-cluster-infra (clusters/newton-core/prod/code-compiler)
+# and letting Flux/Reloader reconcile.
+#
+# Required secrets on the `production` GitHub Environment:
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY — scoped IAM user with
+#   ecr:* push/pull/list on the `judge0` repo in 405612465938 only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "build" to confirm a production image build & push'
+        required: true
+        type: string
+      ref:
+        description: "Branch, tag, or SHA to build"
+        required: false
+        default: "master"
+
+concurrency:
+  group: build-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: judge0
+
+jobs:
+  validate-confirmation:
+    runs-on: monkci-ubuntu-24.04-4
+    steps:
+      - name: Check the typed confirmation matches "build"
+        run: |
+          if [ "${{ inputs.confirm }}" != "build" ]; then
+            echo "::error::You must type exactly 'build' to confirm. Got: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+
+  build:
+    needs: validate-confirmation
+    runs-on: monkci-ubuntu-24.04-4
+    timeout-minutes: 60
+    environment:
+      name: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Self-hosted runner disk persists across runs. Only clear cache/images
+      # older than a few days so back-to-back builds still reuse layers.
+      - name: Reclaim stale Docker build cache
+        run: |
+          docker builder prune -af --filter "until=72h" || true
+          docker image prune -af --filter "until=72h" || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - name: Resolve image tag
+        id: tags
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: NewtonDockerfile
+          target: production
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tags.outputs.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Summary
+        run: |
+          echo "Pushed \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"

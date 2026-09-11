@@ -1,0 +1,107 @@
+name: Build & push → staging ECR
+
+# Builds the NewtonDockerfile "production" image and pushes it to the
+# staging ECR registry (account 552623333554, ap-south-1). This does NOT
+# deploy anything — staging currently runs newtonschool/newton-judge0
+# from Docker Hub; rolling this image out still means pinning the new
+# tag in kubernetes-cluster-infra (clusters/newton-core/staging/code-compiler)
+# and letting Flux reconcile.
+#
+# Triggers:
+#   - Auto: push to `master`
+#   - Auto (opt-in): push to any other branch whose HEAD commit message
+#     contains "[BUILD]" — mirrors the existing newton-api/newton-web
+#     CodeBuild convention so feature branches can be test-built on demand.
+#   - Manual: workflow_dispatch
+#
+# Required secrets on the `staging` GitHub Environment:
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY — scoped IAM user with
+#   ecr:*  push/pull/list on the `judge0` repo in 552623333554 only.
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: judge0
+
+jobs:
+  guard:
+    runs-on: monkci-ubuntu-24.04-4
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - name: Decide whether this push should build
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "${{ github.event.head_commit.message }}" | grep -qF '[BUILD]'; then
+            echo "  Commit message contains [BUILD] — building non-master branch."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "  No [BUILD] tag and not master — skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: guard
+    if: needs.guard.outputs.proceed == 'true'
+    runs-on: monkci-ubuntu-24.04-4
+    timeout-minutes: 60
+    environment:
+      name: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Self-hosted runner disk persists across runs. Only clear cache/images
+      # older than a few days so back-to-back builds still reuse layers.
+      - name: Reclaim stale Docker build cache
+        run: |
+          docker builder prune -af --filter "until=72h" || true
+          docker image prune -af --filter "until=72h" || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - name: Resolve image tag
+        id: tags
+        run: echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: NewtonDockerfile
+          target: production
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tags.outputs.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Summary
+        run: |
+          echo "Pushed \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
