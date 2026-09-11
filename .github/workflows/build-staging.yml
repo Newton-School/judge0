@@ -16,8 +16,8 @@ name: Build & push → staging ECR
 #
 # Required org-level secrets (shared across repos, one credential per
 # account rather than per-repo/per-environment):
-#   AWS_STAGING_ECR_ACCESS_KEY_ID / AWS_STAGING_ECR_SECRET_ACCESS_KEY /
-#   AWS_STAGING_ECR_REGION — judge0_builder IAM user, scoped to
+#   AWS_STAGING_ACCESS_KEY_ID / AWS_STAGING_SECRET_ACCESS_KEY /
+#   AWS_STAGING_DEFAULT_REGION — github_actions IAM user, scoped to
 #   push/pull/list on the `judge0` repo in 552623333554 only (can be
 #   widened to other repos later as usage grows).
 
@@ -66,9 +66,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_STAGING_ECR_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_STAGING_ECR_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_STAGING_ECR_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_STAGING_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_STAGING_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_STAGING_DEFAULT_REGION }}
 
       - name: Login to Amazon ECR
         id: ecr-login
