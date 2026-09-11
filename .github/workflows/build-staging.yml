@@ -1,26 +1,5 @@
 name: Trigger Staging Build
 
-# Builds the NewtonDockerfile "production" image and pushes it to the
-# staging ECR registry (account 552623333554, ap-south-1). This does NOT
-# deploy anything — staging currently runs newtonschool/newton-judge0
-# from Docker Hub; rolling this image out still means pinning the new
-# tag in kubernetes-cluster-infra (clusters/newton-core/staging/code-compiler)
-# and letting Flux reconcile.
-#
-# Triggers:
-#   - Auto: push to `master`
-#   - Auto (opt-in): push to any other branch whose HEAD commit message
-#     contains "[BUILD]" — mirrors the existing newton-api/newton-web
-#     CodeBuild convention so feature branches can be test-built on demand.
-#   - Manual: workflow_dispatch
-#
-# Required org-level secrets (shared across repos, one credential per
-# account rather than per-repo/per-environment):
-#   AWS_STAGING_ACCESS_KEY_ID / AWS_STAGING_SECRET_ACCESS_KEY /
-#   AWS_STAGING_DEFAULT_REGION — github_actions IAM user, scoped to
-#   push/pull/list on the `judge0` repo in 552623333554 only (can be
-#   widened to other repos later as usage grows).
-
 on:
   push:
     branches: ["**"]
@@ -47,10 +26,8 @@ jobs:
           elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           elif printf '%s' "${{ github.event.head_commit.message }}" | grep -qF '[BUILD]'; then
-            echo "  Commit message contains [BUILD] — building non-master branch."
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "  No [BUILD] tag and not master — skipping."
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -74,8 +51,6 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Self-hosted runner disk persists across runs. Only clear cache/images
-      # older than a few days so back-to-back builds still reuse layers.
       - name: Reclaim stale Docker build cache
         run: |
           docker builder prune -af --filter "until=72h" || true

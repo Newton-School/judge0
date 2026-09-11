@@ -1,22 +1,5 @@
 name: Trigger Production Build
 
-# Production ECR pushes are MANUAL ONLY (workflow_dispatch), gated by the
-# 'production' GitHub Environment's required reviewer (configure in repo
-# settings → Environments). Builds whatever ref the dispatch was run
-# against — no separate confirmation or ref input needed.
-#
-# This only builds & pushes the image to ECR (account 405612465938,
-# ap-south-1) — it does NOT roll it out. Deploying still means bumping the
-# tag in kubernetes-cluster-infra (clusters/newton-core/prod/code-compiler)
-# and letting Flux/Reloader reconcile.
-#
-# Required org-level secrets (shared across repos, one credential per
-# account rather than per-repo/per-environment):
-#   AWS_PROD_ACCESS_KEY_ID / AWS_PROD_SECRET_ACCESS_KEY /
-#   AWS_PROD_DEFAULT_REGION — github_actions IAM user, scoped to push/pull/list
-#   on the `judge0` repo in 405612465938 only (can be widened to other
-#   repos later as usage grows).
-
 on:
   workflow_dispatch:
 
@@ -48,8 +31,6 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Self-hosted runner disk persists across runs. Only clear cache/images
-      # older than a few days so back-to-back builds still reuse layers.
       - name: Reclaim stale Docker build cache
         run: |
           docker builder prune -af --filter "until=72h" || true
