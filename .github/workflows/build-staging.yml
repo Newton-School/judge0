@@ -15,19 +15,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_STAGING_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_STAGING_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_STAGING_DEFAULT_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Resolve image tag
         id: tags
@@ -41,12 +36,12 @@ jobs:
           target: production
           push: true
           platforms: linux/amd64
-          cache-from: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/judge0:buildcache
-          cache-to: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/judge0:buildcache,mode=max
+          cache-from: type=registry,ref=newtonschool/newton-judge0:buildcache
+          cache-to: type=registry,ref=newtonschool/newton-judge0:buildcache,mode=max
           tags: |
-            ${{ steps.ecr-login.outputs.registry }}/judge0:${{ steps.tags.outputs.sha }}
-            ${{ steps.ecr-login.outputs.registry }}/judge0:latest
+            newtonschool/newton-judge0:${{ steps.tags.outputs.sha }}
+            newtonschool/newton-judge0:latest
 
       - name: Summary
         run: |
-          echo "Pushed \`${{ steps.ecr-login.outputs.registry }}/judge0:${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`newtonschool/newton-judge0:${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
