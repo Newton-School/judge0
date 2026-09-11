@@ -12,9 +12,12 @@ name: Build & push → production ECR
 # tag in kubernetes-cluster-infra (clusters/newton-core/prod/code-compiler)
 # and letting Flux/Reloader reconcile.
 #
-# Required secrets on the `production` GitHub Environment:
-#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY — scoped IAM user with
-#   ecr:* push/pull/list on the `judge0` repo in 405612465938 only.
+# Required org-level secrets (shared across repos, one credential per
+# account rather than per-repo/per-environment):
+#   AWS_PROD_ECR_ACCESS_KEY_ID / AWS_PROD_ECR_SECRET_ACCESS_KEY /
+#   AWS_PROD_ECR_REGION — judge0_builder IAM user, scoped to push/pull/list
+#   on the `judge0` repo in 405612465938 only (can be widened to other
+#   repos later as usage grows).
 
 on:
   workflow_dispatch:
@@ -33,7 +36,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ap-south-1
   ECR_REPOSITORY: judge0
 
 jobs:
@@ -62,9 +64,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_PROD_ECR_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_ECR_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_PROD_ECR_REGION }}
 
       - name: Login to Amazon ECR
         id: ecr-login
