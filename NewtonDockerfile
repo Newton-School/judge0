@@ -1,4 +1,7 @@
-FROM newtonschool/judge0-newton-compiler:0.36 AS production
+# Compiler base is pinned to the commit SHA the compilers CI actually pushes;
+# the 0.3x numbers in that repo are a doc convention, not published tags.
+# 0da5960 = Newton-School/compilers#21 (adds man-db as Tier 14).
+FROM newtonschool/judge0-newton-compiler:0da5960f7ebb4f43fd1b9f5cd00c27a0f8a0b679 AS production
 
 
 ENV JUDGE0_HOMEPAGE "https://judge0-public.newtonschool.co/"

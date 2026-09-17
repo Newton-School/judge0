@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0.36` | what we layer on |
+| Compiler base | `newtonschool/judge0-newton-compiler:0da5960f7ebb…` | what we layer on; compilers CI tags by commit SHA, not semver |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -200,10 +200,11 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world or equivalent behavioral smoke for every active language
-id. Expected after CircuitRun Arduino Uno support on top of 0.76:
-**30 PASS / 0 FAIL / 0 SKIP** on amd64; **28 PASS / 0 FAIL / 2 SKIP** on
+id. Expected after `man` support on top of 0.76:
+**32 PASS / 0 FAIL / 0 SKIP** on amd64; **30 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
-CircuitRun result artifacts each add an asset-metadata PASS.
+CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
+contributes three (hello-world, `man`, `whatis`).
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
@@ -274,6 +275,17 @@ in `judge0.conf` explain each. Summary:
   for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
   `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
   28/0/0 on amd64.
+- **The compiler base is pinned by commit SHA, not semver.** The compilers
+  workflow pushes `judge0-newton-compiler:<git-sha>` and `:latest` only; the
+  `0.35`/`0.36` tags on Docker Hub were hand-pushed months ago, and the
+  `0.3x` numbering now lives solely in that repo's
+  `org.opencontainers.image.version` label — a semver tag for a new build
+  will not exist. `NewtonDockerfile` currently pins
+  `0da5960f7ebb4f43fd1b9f5cd00c27a0f8a0b679` (Newton-School/compilers#21,
+  which adds man-db so the Bash lane can use `man`). Both workflows here
+  likewise push `newton-judge0:<git-sha>` and `:latest`, so the version
+  numbers elsewhere in this file are a local-build convention rather than
+  anything CI produces.
 - Production runs `newton-judge0:0.76` from ECR
   (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-17.
   Smoke green against `https://judge0-public.newtonschool.co`
