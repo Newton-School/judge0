@@ -173,6 +173,13 @@ section() { printf "\n\033[1m== %s ==\033[0m\n" "$1"; }
 # ────────────────────────────────────────────────────────────────────────
 SRC_BASH='echo "Hello, Newton!"'
 
+# man-db lives in the compiler image from compilers#21. These two run inside
+# the real isolate mount set, which is the point: /usr and /etc are mounted but
+# /var is not, so the mandb index is relocated under /usr at build time. `man`
+# alone would still pass with a broken index — whatis is what catches that.
+SRC_BASH_MAN='man ls | grep -m1 "list directory contents"'
+SRC_BASH_WHATIS='whatis tar'
+
 SRC_C='#include <stdio.h>
 int main(void) { printf("Hello, Newton!\n"); return 0; }'
 
@@ -410,6 +417,8 @@ STDIN_CIRCUITRUN_ARDUINO='{
 section "Shell / scripting"
 # ────────────────────────────────────────────────────────────────────────
 t "Bash 5.2.37 (46)"            46   "$SRC_BASH"
+t "Bash man (46)"               46   "$SRC_BASH_MAN"    "list directory contents"
+t "Bash whatis (46)"            46   "$SRC_BASH_WHATIS" "an archiving utility"
 t "Python 3.13.1 (71)"          71   "$SRC_PYTHON"
 t "Python 3.12.7 ML (2000)"     2000 "$SRC_PYTHON_ML"
 t "Ruby 3.3.6 (72)"             72   "$SRC_RUBY"
