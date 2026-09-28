@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:0da5960f7ebb…` | what we layer on; compilers CI tags by commit SHA, not semver |
+| Compiler base | `newtonschool/judge0-newton-compiler:da70ed9d8b21…` | what we layer on; compilers CI tags by commit SHA, not semver |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -281,8 +281,10 @@ in `judge0.conf` explain each. Summary:
   `0.3x` numbering now lives solely in that repo's
   `org.opencontainers.image.version` label — a semver tag for a new build
   will not exist. `NewtonDockerfile` currently pins
-  `0da5960f7ebb4f43fd1b9f5cd00c27a0f8a0b679` (Newton-School/compilers#21,
-  which adds man-db so the Bash lane can use `man`). Both workflows here
+  `da70ed9d8b21d677c04c5c82c2aaf59e77a9d155` (Newton-School/compilers#22,
+  which caps CircuitRun's arduino-cli at `--jobs 4` / `GOMAXPROCS=4` so
+  Arduino builds fit isolate's RLIMIT_NPROC; #21 before it added man-db
+  for the Bash lane). Both workflows here
   likewise push `newton-judge0:<git-sha>` and `:latest`, so the version
   numbers elsewhere in this file are a local-build convention rather than
   anything CI produces.
