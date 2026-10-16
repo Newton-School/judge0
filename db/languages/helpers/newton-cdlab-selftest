@@ -1,0 +1,568 @@
+#!/bin/bash
+# newton-cdlab-selftest - self-test for newton-bundle-split and
+# newton-cdlab-build (judge0 language 3010, "C + Lex/Yacc").
+#
+# NewtonDockerfile runs it at image build, after installing the helpers to
+# /usr/local/bin, against the compiler image's real flex, bison and GCC 9.5.
+# An image whose 3010 lane cannot build and run programs (for example one on
+# a compiler base older than compilers Tier 15, label 0.39) is never
+# produced. Also runnable by hand:
+#     newton-cdlab-selftest                        # tests /usr/local/bin
+#     bash db/languages/helpers/newton-cdlab-selftest db/languages/helpers
+#
+# USAGE: newton-cdlab-selftest [HELPER_DIR]   (default /usr/local/bin)
+# Exit 0 when every case passes; otherwise 1, with the failures listed.
+#
+# All fixtures are inline and self-authored. Each lane case writes a
+# main.bundle into a fresh directory standing in for the isolate box, runs
+# the build there like judge0's compile step, then feeds ./a.out its stdin.
+# Bundles are composed the way the product composes source_code:
+# pre + "\n" + editor text + "\n" + post, with editor text that usually has
+# no trailing newline.
+
+set -u
+export LC_ALL=C
+
+# The 3010 name in db/languages/active.rb advertises these versions.
+WANT_GCC=9.5.0 WANT_FLEX=2.6.4 WANT_BISON=3.8.2
+
+dir=${1:-/usr/local/bin}
+SPLIT=$dir/newton-bundle-split
+BUILD=$dir/newton-cdlab-build
+
+fatal() { printf 'newton-cdlab-selftest: %s\n' "$*" >&2; exit 1; }
+need_tier15() {
+    fatal "$1. Language 3010 needs flex, bison, m4, libfl and liby from" \
+          "compilers Tier 15 (image label 0.39 or later); check the FROM line in NewtonDockerfile."
+}
+
+for f in "$SPLIT" "$BUILD"; do
+    [ -x "$f" ] || fatal "$f is missing or not executable"
+done
+[ -x /usr/local/gcc-9.5.0/bin/gcc ] || fatal "/usr/local/gcc-9.5.0/bin/gcc is missing"
+for t in flex bison m4; do
+    [ -x /usr/bin/$t ] || need_tier15 "/usr/bin/$t is missing"
+done
+v=$(/usr/local/gcc-9.5.0/bin/gcc -dumpfullversion)
+[ "$v" = "$WANT_GCC" ] || fatal "GCC is $v, expected $WANT_GCC"
+v=$(/usr/bin/flex --version)
+[ "$v" = "flex $WANT_FLEX" ] ||
+    fatal "flex reports '$v', expected 'flex $WANT_FLEX': update the 3010 name in active.rb and WANT_FLEX here"
+v=$(/usr/bin/bison --version | head -n 1)
+[ "${v##* }" = "$WANT_BISON" ] ||
+    fatal "bison reports '$v', expected $WANT_BISON: update the 3010 name in active.rb and WANT_BISON here"
+
+W=$(mktemp -d) || fatal "cannot create a work directory"
+trap 'rm -rf -- "$W"' EXIT
+
+pass=0
+failed=()
+ok() { pass=$((pass + 1)); printf 'ok   %s\n' "$1"; }
+bad() {  # bad CASE REASON [DETAILS]
+    failed+=("$1")
+    printf 'FAIL %s: %s\n' "$1" "$2"
+    if [ -n "${3-}" ]; then printf '%s\n' "$3" | sed 's/^/     | /'; fi
+}
+
+compose() { printf '%s\n%s\n%s' "$1" "$2" "$3"; }   # pre + "\n" + src + "\n" + post
+crlf() { printf '%s' "$1" | sed 's/$/\r/'; }
+box_files() { find "$1" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' '; }
+
+# build CASE BUNDLE [compiler options...]: fresh box holding main.bundle, run
+# the build in it. Sets BOX, RC and LOG (everything the build printed).
+boxes=0
+build() {
+    local text=$2
+    shift 2
+    boxes=$((boxes + 1))
+    BOX=$W/box$boxes
+    mkdir "$BOX"
+    printf '%s' "$text" > "$BOX/main.bundle"
+    LOG=$(cd "$BOX" && "$BUILD" "$@" 2>&1)
+    RC=$?
+}
+
+# expect_ok CASE BUNDLE STDIN WANT_STDOUT [LOG_SUBSTRING]
+# The build must succeed and leave only main.bundle and a.out in the box. Its
+# log must be empty, or contain LOG_SUBSTRING when one is given. ./a.out fed
+# STDIN must print exactly WANT_STDOUT. Compiler options come from OPTS.
+OPTS=()
+expect_ok() {
+    local name=$1 bundle=$2 input=$3 want=$4 logwant=${5-} got
+    build "$name" "$bundle" ${OPTS[@]+"${OPTS[@]}"}
+    if [ $RC -ne 0 ]; then bad "$name" "build failed with exit status $RC" "$LOG"; return; fi
+    if [ -z "$logwant" ] && [ -n "$LOG" ]; then bad "$name" "a clean build must print nothing" "$LOG"; return; fi
+    if [ -n "$logwant" ] && [[ $LOG != *"$logwant"* ]]; then bad "$name" "build log lacks [$logwant]" "$LOG"; return; fi
+    got=$(box_files "$BOX")
+    if [ "$got" != "a.out main.bundle " ]; then bad "$name" "box holds: $got"; return; fi
+    got=$(cd "$BOX" && printf '%s' "$input" | timeout 10 ./a.out 2> "$BOX.stderr"; printf x)
+    got=${got%x}
+    if [ "$got" != "$want" ]; then
+        bad "$name" "a.out printed the wrong output" "$(printf 'want: %q\ngot:  %q\nstderr: %s' "$want" "$got" "$(cat "$BOX.stderr")")"
+        return
+    fi
+    ok "$name"
+}
+
+# expect_fail CASE BUNDLE SUBSTRING...
+# The build must fail, leave only main.bundle in the box and print every
+# SUBSTRING. Compiler options come from OPTS.
+expect_fail() {
+    local name=$1 bundle=$2 s got
+    shift 2
+    build "$name" "$bundle" ${OPTS[@]+"${OPTS[@]}"}
+    if [ $RC -eq 0 ]; then bad "$name" "build succeeded but must fail" "$LOG"; return; fi
+    got=$(box_files "$BOX")
+    if [ "$got" != "main.bundle " ]; then bad "$name" "box holds: $got" "$LOG"; return; fi
+    for s in "$@"; do
+        if [[ $LOG != *"$s"* ]]; then bad "$name" "build log lacks [$s]" "$LOG"; return; fi
+    done
+    ok "$name"
+}
+
+# split_run CASE BUNDLE [splitter options...]: run newton-bundle-split
+# directly with extensions 'c|h'. Sets OUT (the output dir), RC, SOUT, SERR.
+split_run() {
+    local name=$1 text=$2
+    shift 2
+    OUT=$W/$name.split
+    mkdir -p "$OUT"
+    printf '%s' "$text" > "$W/$name.bundle"
+    SOUT=$("$SPLIT" "$@" "$W/$name.bundle" "$OUT" 'c|h' 2> "$W/$name.err")
+    RC=$?
+    SERR=$(cat "$W/$name.err")
+}
+
+# ---------------------------------------------------------------- fixtures --
+
+# A lex spec with no marker: libfl supplies main() and yywrap().
+TOKENS_L=$(cat <<'EOF'
+%%
+[0-9]+                  printf("NUM(%s)\n", yytext);
+[A-Za-z_][A-Za-z0-9_]*  printf("ID(%s)\n", yytext);
+[ \t\r\n]+              ;
+.                       printf("OP(%s)\n", yytext);
+%%
+EOF
+)
+
+# Editor line 3 has a flex error; flex must report main.l:3.
+FLEXERR_L=$(cat <<'EOF'
+%%
+[a-z]+         printf("w");
+{undefined}    ;
+%%
+EOF
+)
+
+# Lex only, with a marker; its own main() and yywrap() must beat libfl's.
+COUNT_L=$(cat <<'EOF'
+/* ==== FILE: count.l ==== */
+%{
+#include <stdio.h>
+int lines = 0, words = 0;
+%}
+%%
+[A-Za-z]+   words++;
+\n          lines++;
+.           ;
+%%
+int yywrap(void) { printf("yywrap: student\n"); return 1; }
+int main(void) { yylex(); printf("lines=%d words=%d\n", lines, words); return 0; }
+EOF
+)
+
+# Lex + yacc calculator with no main() or yyerror(): liby supplies both,
+# libfl supplies yywrap().
+CALC_Y=$(cat <<'EOF'
+/* ==== FILE: calc.y ==== */
+%{
+#include <stdio.h>
+int yylex(void);
+int yyerror(const char *s);
+%}
+%token NUM
+%left '+' '-'
+%left '*' '/'
+%%
+input : /* empty */ | input line ;
+line  : '\n' | expr '\n' { printf("%d\n", $1); } ;
+expr  : NUM
+      | expr '+' expr { $$ = $1 + $3; }
+      | expr '-' expr { $$ = $1 - $3; }
+      | expr '*' expr { $$ = $1 * $3; }
+      | expr '/' expr { $$ = $1 / $3; }
+      | '(' expr ')'  { $$ = $2; }
+      ;
+%%
+EOF
+)
+CALC_L=$(cat <<'EOF'
+/* ==== FILE: calc.l ==== */
+%{
+#include <stdlib.h>
+#include "y.tab.h"
+%}
+%%
+[0-9]+     { yylval = atoi(yytext); return NUM; }
+[ \t\r]    ;
+\n         { return '\n'; }
+.          { return yytext[0]; }
+%%
+EOF
+)
+# The same calculator with its own main() and yyerror(): they must beat liby's.
+CALC_OWN_MAIN="$CALC_Y
+int yyerror(const char *s) { printf(\"error: %s\\n\", s); return 0; }
+int main(void) { printf(\"calc ready\\n\"); return yyparse(); }"
+
+# A lab whose student files (.l, .y) come first and whose read-only files
+# (.h, .c) arrive after them via post_function_code.
+STUDENT=$(cat <<'EOF'
+/* ==== FILE: expr.l ==== */
+%{
+#include <stdlib.h>
+#include "ast.h"
+#include "y.tab.h"
+%}
+%option noyywrap
+%%
+[0-9]+      { yylval = atoi(yytext); return NUM; }
+[ \t\r\n]+  ;
+.           { return yytext[0]; }
+%%
+/* ==== FILE: expr.y ==== */
+%{
+#include "ast.h"
+int yylex(void);
+%}
+%token NUM
+%left '+'
+%left '*'
+%%
+prog : expr ';'           { report($1); } ;
+expr : NUM
+     | expr '+' expr      { $$ = emit('+', $1, $3); }
+     | expr '*' expr      { $$ = emit('*', $1, $3); }
+     ;
+%%
+EOF
+)
+LOCKED=$(cat <<'EOF'
+/* ==== FILE: ast.h ==== */
+#ifndef AST_H
+#define AST_H
+int emit(int op, int a, int b);
+void report(int value);
+int yyerror(const char *s);
+#endif
+/* ==== FILE: driver.c ==== */
+#include <stdio.h>
+#include "ast.h"
+int yyparse(void);
+static int temps = 0;
+int emit(int op, int a, int b)
+{
+    printf("t%d = %d %c %d\n", temps++, a, op, b);
+    return op == '+' ? a + b : a * b;
+}
+void report(int value) { printf("result = %d\n", value); }
+int yyerror(const char *s) { printf("syntax error: %s\n", s); return 0; }
+int main(void) { printf("== driver ==\n"); return yyparse(); }
+EOF
+)
+LAB_OUT=$'== driver ==\nt0 = 3 * 4\nt1 = 2 + 12\nresult = 14\n'
+
+# Plain C over several files; needs -lm, and SCALE comes from compiler options.
+PURE_C=$(cat <<'EOF'
+/* ==== FILE: main.c ==== */
+#include <stdio.h>
+#include "geo.h"
+int main(void)
+{
+    double side;
+    if (scanf("%lf", &side) != 1) return 1;
+    printf("diagonal %.3f\n", diagonal(side * SCALE));
+    return 0;
+}
+/* ==== FILE: geo.h ==== */
+#ifndef GEO_H
+#define GEO_H
+#ifndef SCALE
+#define SCALE 1
+#endif
+double diagonal(double side);
+#endif
+/* ==== FILE: geo.c ==== */
+#include <math.h>
+#include "geo.h"
+double diagonal(double side) { return sqrt(2.0 * side * side); }
+EOF
+)
+
+# Grammar with a shift/reduce conflict: bison warns but the build succeeds.
+CONFLICT_Y=$(cat <<'EOF'
+/* ==== FILE: amb.y ==== */
+%{
+#include <stdio.h>
+int yylex(void) { return 0; }
+int yyerror(const char *s) { return 0; }
+%}
+%token NUM
+%%
+e : e '+' e | NUM | /* empty */ ;
+%%
+int main(void) { printf("parsed %d\n", yyparse()); return 0; }
+EOF
+)
+
+# Errors at known lines of each file (the marker is not part of the file).
+BISON_ERR=$(cat <<'EOF'
+/* ==== FILE: bad.y ==== */
+%token NUM
+%%
+s : NUM ::
+  ;
+%%
+EOF
+)
+FLEX_ERR=$(cat <<'EOF'
+/* ==== FILE: bad.l ==== */
+%%
+[a-z]+   printf("w");
+{nodef}  ;
+%%
+EOF
+)
+GCC_ERR=$(cat <<'EOF'
+/* ==== FILE: main.c ==== */
+#include <stdio.h>
+int main(void) {
+    printf("%d\n", missing);
+    return 0;
+}
+EOF
+)
+# A C error inside a grammar action is reported at the .y line (bison #line).
+ACTION_ERR=$(cat <<'EOF'
+/* ==== FILE: act.y ==== */
+%{
+#include <stdio.h>
+int yylex(void) { return 0; }
+int yyerror(const char *s) { return 0; }
+%}
+%%
+s : /* empty */ { printf("%d\n", undefined_name); } ;
+%%
+EOF
+)
+
+# ------------------------------------------------------------ lane: builds --
+
+expect_ok markerless_lex_only "$(compose "" "$TOKENS_L" "")" $'x = 42;\n' \
+    $'ID(x)\nOP(=)\nNUM(42)\nOP(;)\n'
+expect_ok markerless_lex_only_raw "$TOKENS_L" 'n1 7' $'ID(n1)\nNUM(7)\n'
+expect_ok markerless_lex_only_crlf "$(compose "" "$(crlf "$TOKENS_L")" "")" $'a+1\r\n' \
+    $'ID(a)\nOP(+)\nNUM(1)\n'
+expect_ok lex_only_with_marker_student_main_yywrap "$(compose "" "$COUNT_L" "")" \
+    $'one two\nthree\n' $'yywrap: student\nlines=2 words=3\n'
+expect_ok lex_yacc_calc_liby_main "$(compose "" "$CALC_Y
+$CALC_L" "")" $'1+2*3\n(1+2)*3\n10/3-1\n' $'7\n9\n2\n'
+expect_ok lex_yacc_student_main_yyerror "$(compose "" "$CALC_OWN_MAIN
+$CALC_L" "")" $'1+2\n2+\n' $'calc ready\n3\nerror: syntax error\n'
+expect_ok locked_files_in_post "$(compose "" "$STUDENT" "$LOCKED")" '2+3*4;' "$LAB_OUT"
+expect_ok crlf_everywhere "$(compose "$(crlf "")" "$(crlf "$STUDENT")" "$(crlf "$LOCKED")")" \
+    '2+3*4;' "$LAB_OUT"
+expect_ok no_trailing_newlines_uncomposed "$STUDENT
+$LOCKED" '2+3*4;' "$LAB_OUT"
+OPTS=(-DSCALE=3)
+expect_ok pure_c_multi_file_with_options "$(compose "" "$PURE_C" "")" '1' $'diagonal 4.243\n'
+OPTS=()
+expect_ok bison_warning_still_builds "$(compose "" "$CONFLICT_Y" "")" '' $'parsed 0\n' \
+    '==> bison -y -d amb.y'
+
+# ---------------------------------------------------------- lane: failures --
+
+expect_fail flex_error_line_matches_editor "$(compose "" "$FLEXERR_L" "")" \
+    '==> flex main.l' 'main.l:3: undefined definition'
+if [[ $LOG == *main.l:4* ]]; then bad flex_error_line_matches_editor "flex reported line 4" "$LOG"; fi
+expect_fail flex_error_line_matches_editor_crlf "$(compose "" "$(crlf "$FLEXERR_L")" "")" \
+    'main.l:3: undefined definition'
+expect_fail bison_syntax_error "$(compose "" "$BISON_ERR" "")" '==> bison -y -d bad.y' 'bad.y:3.'
+expect_fail flex_error_with_marker "$(compose "" "$FLEX_ERR" "")" '==> flex bad.l' 'bad.l:3: undefined definition'
+expect_fail gcc_error "$(compose "" "$GCC_ERR" "")" '==> gcc main.c -lm -o a.out' 'main.c:3:' 'missing'
+expect_fail gcc_error_in_grammar_action "$(compose "" "$ACTION_ERR" "")" '==> gcc y.tab.c -ly -lm -o a.out' \
+    'act.y:7:' 'undefined_name'
+expect_fail duplicate_name_ignoring_case "$(compose "" "$STUDENT
+/* ==== FILE: Driver.c ==== */
+int helper;" "$LOCKED")" '"Driver.c"' '"driver.c"' 'read-only'
+expect_fail reserved_name "$(compose "" "$CALC_Y
+/* ==== FILE: y.tab.h ==== */
+#define NUM 258" "")" 'reserved name' 'y.tab.h'
+for name in ../x.c .hidden.c -o.c x.txt a/b.c 'two words.c' noext; do
+    expect_fail "bad_name:$name" "$(compose "" "/* ==== FILE: ok.c ==== */
+int main(void) { return 0; }
+/* ==== FILE: $name ==== */
+int x;" "")" 'bundle line 3:' "$name"
+done
+for marker in '/* === FILE: a.c === */' '/* ==== file: a.c ==== */' '/* ==== FILE: a.c ====' \
+              '/* ==== FILE : a.c ==== */' '/* ==== FILE: ==== */'; do
+    expect_fail "malformed_marker:$marker" "$(compose "" "/* ==== FILE: ok.c ==== */
+int main(void) { return 0; }
+$marker
+int x;" "")" 'bundle line 3: malformed file marker'
+done
+expect_fail marker_glued_to_previous_line "$(compose "" "/* ==== FILE: ok.c ==== */
+int main(void) { return 0; }/* ==== FILE: b.c ==== */" "")" \
+    'bundle line 2:' 'on a line of its own'
+expect_fail text_before_first_marker "$(compose "" "int stray;
+/* ==== FILE: a.c ==== */
+int main(void) { return 0; }" "")" 'bundle line 1: text before the first file marker'
+expect_fail unmarked_lex_with_locked_c "$(compose "" "$TOKENS_L" "/* ==== FILE: helper.c ==== */
+int helper(void) { return 1; }")" 'text before the first file marker'
+expect_fail two_y_files "$(compose "" "$CALC_Y
+${CALC_Y/calc.y/calc2.y}" "")" 'at most one .y file'
+expect_fail two_l_files "$(compose "" "$CALC_L
+${CALC_L/calc.l/calc2.l}" "")" 'at most one .l file'
+expect_fail headers_only "$(compose "" "/* ==== FILE: a.h ==== */
+int a;" "")" 'nothing to build'
+expect_fail empty_submission "$(compose "" "" "")" 'the submission is empty'
+
+# Exactly ONE leading empty line is dropped: an editor text that itself starts
+# with a blank line keeps it, so flex's line numbers still match the editor.
+expect_fail markerless_editor_blank_first_line_kept "$(compose "" "
+$FLEXERR_L" "")" 'main.l:4: undefined definition'
+bom=$'\xef\xbb\xbf'
+expect_ok markerless_bom_dropped "$(compose "" "$bom$TOKENS_L" "")" 'k 5' $'ID(k)\nNUM(5)\n'
+
+# bison feeds a %skeleton file to m4, whose m4_esyscmd would run shell code
+# from the submission at compile time: the build must refuse it unrun.
+expect_fail skeleton_rejected_before_bison "$(compose "" "/* ==== FILE: x.y ==== */
+%skeleton \"./evil.h\"
+%%
+s : ;
+%%
+/* ==== FILE: evil.h ==== */
+m4_esyscmd([touch $W/skeleton-ran])" "")" '%skeleton is not supported'
+if [ -e "$W/skeleton-ran" ]; then bad skeleton_rejected_before_bison "the skeleton's m4_esyscmd ran"; fi
+
+# Name length: 64 characters is fine, 65 is not, and a huge name is cut short
+# in the message instead of being echoed into compile_output whole.
+n62=$(printf 'n%.0s' $(seq 62))
+expect_ok name_64_chars "$(compose "" "/* ==== FILE: $n62.c ==== */
+int main(void) { return 0; }" "")" '' ''
+expect_fail name_65_chars "$(compose "" "/* ==== FILE: x$n62.c ==== */
+int main(void) { return 0; }" "")" 'bundle line 1:' 'longer than 64 characters'
+long=$(printf 'L%.0s' $(seq 5000))
+expect_fail huge_name_cut_short "$(compose "" "/* ==== FILE: $long.c ==== */
+int main(void) { return 0; }" "")" 'longer than 64 characters' '...'
+if [ ${#LOG} -gt 600 ]; then bad huge_name_cut_short "message is ${#LOG} bytes long" "${LOG:0:300}"; fi
+
+# Look-alike markers (no-break space, fullwidth '=') must be errors, never
+# silently merged into the previous file.
+nbsp=$'\xc2\xa0' fweq=$'\xef\xbc\x9d'
+for lookalike in "/*$nbsp==== FILE: b.c ==== */" "/* $fweq$fweq$fweq$fweq FILE: b.c ==== */"; do
+    expect_fail "lookalike_marker:$(printf '%q' "$lookalike")" "$(compose "" "/* ==== FILE: a.c ==== */
+int main(void) { return 0; }
+$lookalike
+int b;" "")" 'bundle line 3: malformed file marker' 'non-ASCII'
+done
+
+# A banner comment that reads as a marker: the error names the line that
+# switched a marker-less lex file to bundle mode, and says how to fix it.
+expect_fail markerless_banner_named_in_error "$(compose "" "$TOKENS_L
+/*====== File: scanner.l (user code) ======*/
+int helper;" "")" 'bundle line 1: text before the first file marker' \
+    'bundle line 7 is read as a file marker: /*====== File: scanner.l' 'start your file with a marker line'
+expect_fail banner_in_marked_file "$(compose "" "/* ==== FILE: m.c ==== */
+/*================== File: m.c ==================*/
+int main(void) { return 0; }" "")" 'bundle line 2: malformed file marker' 'reword it'
+
+# Long files are copied by sed, not line by line in bash.
+blank=$(printf '%*s' 200000 '' | tr ' ' '\n'; printf x)
+blank=${blank%x}
+expect_ok many_lines_between_markers "$(compose "" "/* ==== FILE: m.c ==== */
+#include <stdio.h>
+int f(void);
+int main(void) { printf(\"%d\\n\", f()); return 0; }$blank
+/* ==== FILE: f.c ==== */$blank
+int f(void) { return __LINE__; }" "")" '' $'200001\n'
+
+# ------------------------------------------------- generic splitter itself --
+
+split_run no_markers $'int main(void) { return 0; }\n'
+if [ $RC -eq 3 ] && [ -z "$(ls -A "$OUT")" ] && [[ $SERR == *"no /* ==== FILE"* ]]; then
+    ok split_no_markers_exit_3
+else
+    bad split_no_markers_exit_3 "exit $RC, out: $(ls -A "$OUT")" "$SERR"
+fi
+
+split_run normalise $'\n \t\n'"$bom"$'/* ==== FILE: a.c ==== */\r\nint a;\r\n\r\n  /*====FILE:   b.h ====*/  \nint b;'
+if [ $RC -eq 0 ] && [ "$SOUT" = $'a.c\nb.h' ] &&
+   [ "$(od -An -c "$OUT/a.c" | tr -s ' ')" = "$(printf 'int a;\n\n' | od -An -c | tr -s ' ')" ] &&
+   [ "$(od -An -c "$OUT/b.h" | tr -s ' ')" = "$(printf 'int b;\n' | od -An -c | tr -s ' ')" ]; then
+    ok split_crlf_bom_blank_lead_spacing_final_newline
+else
+    bad split_crlf_bom_blank_lead_spacing_final_newline "exit $RC, names [$SOUT]" \
+        "$SERR$(for f in "$OUT"/*; do printf '\n%s: ' "$f"; od -An -c "$f"; done)"
+fi
+
+three=$'/* ==== FILE: a.c ==== */\n/* ==== FILE: b.c ==== */\n/* ==== FILE: c.c ==== */\n'
+split_run max_files "$three" -n 2
+if [ $RC -eq 1 ] && [[ $SERR == *"more than 2 files"* ]] && [ -z "$(ls -A "$OUT")" ]; then
+    ok split_file_cap_leaves_nothing
+else
+    bad split_file_cap_leaves_nothing "exit $RC, out: $(ls -A "$OUT")" "$SERR"
+fi
+
+split_run max_bytes "$three" -s 10
+if [ $RC -eq 1 ] && [[ $SERR == *"limit is 10 bytes"* ]]; then ok split_size_cap; else bad split_size_cap "exit $RC" "$SERR"; fi
+size=${#three}
+split_run max_bytes_exact "$three" -s "$size"
+if [ $RC -eq 0 ]; then ok split_size_cap_exact_fits; else bad split_size_cap_exact_fits "exit $RC at -s $size" "$SERR"; fi
+split_run max_bytes_one_over "$three" -s "$((size - 1))"
+if [ $RC -eq 1 ] && [[ $SERR == *"limit is $((size - 1)) bytes"* ]]; then
+    ok split_size_cap_one_over
+else
+    bad split_size_cap_one_over "exit $RC at -s $((size - 1))" "$SERR"
+fi
+
+split_run empty_files $'/* ==== FILE: a.c ==== */\n/* ==== FILE: b.c ==== */\nint b;\r\r\n/* ==== FILE: c.h ==== */'
+if [ $RC -eq 0 ] && [ "$SOUT" = $'a.c\nb.c\nc.h' ] && [ ! -s "$OUT/a.c" ] && [ ! -s "$OUT/c.h" ] &&
+   [ "$(od -An -c "$OUT/b.c" | tr -s ' ')" = "$(printf 'int b;\r\n' | od -An -c | tr -s ' ')" ]; then
+    ok split_empty_files_and_one_cr_dropped
+else
+    bad split_empty_files_and_one_cr_dropped "exit $RC, names [$SOUT]" \
+        "$SERR$(for f in "$OUT"/*; do printf '\n%s: ' "$f"; od -An -c "$f"; done)"
+fi
+
+split_run nul_byte $'/* ==== FILE: a.c ==== */\nint a;\001\n'
+printf '/* ==== FILE: a.c ==== */\nint\000 a;\n' > "$W/nul_byte.bundle"
+rm -rf "$W/nul_byte.split" && mkdir "$W/nul_byte.split"
+SERR=$("$SPLIT" "$W/nul_byte.bundle" "$W/nul_byte.split" 'c' 2>&1 >/dev/null)
+RC=$?
+if [ $RC -eq 1 ] && [[ $SERR == *"NUL bytes"* ]]; then ok split_rejects_nul; else bad split_rejects_nul "exit $RC" "$SERR"; fi
+
+split_run reserved $'/* ==== FILE: Y.TAB.H ==== */\nint a;\n' -r y.tab.h
+if [ $RC -eq 1 ] && [[ $SERR == *"reserved name"* ]]; then ok split_reserved_ignores_case; else bad split_reserved_ignores_case "exit $RC" "$SERR"; fi
+
+split_run nonempty_out $'/* ==== FILE: a.c ==== */\n'
+: > "$OUT/existing"
+SERR=$("$SPLIT" "$W/nonempty_out.bundle" "$OUT" 'c' 2>&1 >/dev/null)
+RC=$?
+if [ $RC -eq 2 ] && [[ $SERR == *"not empty"* ]]; then ok split_refuses_nonempty_outdir; else bad split_refuses_nonempty_outdir "exit $RC" "$SERR"; fi
+
+mkdir "$W/badre.split"
+SERR=$("$SPLIT" "$W/nonempty_out.bundle" "$W/badre.split" 'c|(' 2>&1 >/dev/null)
+RC=$?
+if [ $RC -eq 2 ]; then ok split_rejects_bad_ext_regex; else bad split_rejects_bad_ext_regex "exit $RC" "$SERR"; fi
+
+# ------------------------------------------------------------------ result --
+
+total=$((pass + ${#failed[@]}))
+if [ ${#failed[@]} -eq 0 ]; then
+    echo "newton-cdlab-selftest: all $total cases passed"
+    exit 0
+fi
+echo "newton-cdlab-selftest: ${#failed[@]} of $total cases FAILED: ${failed[*]}"
+exit 1

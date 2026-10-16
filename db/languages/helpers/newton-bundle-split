@@ -1,0 +1,261 @@
+#!/bin/bash
+# newton-bundle-split - split a judge0 "bundle" source into separate files.
+#
+# Generic and language-agnostic: it knows nothing about any compiler. A lane
+# whose students edit several files (shown as tabs by the product) gets them
+# joined into one judge0 source_code buffer; the lane's compile step calls this
+# helper inside the isolate sandbox to get the files back. Its first user is
+# newton-cdlab-build (language 3010). Lives in judge0 at db/languages/helpers/;
+# NewtonDockerfile installs it to /usr/local/bin (isolate mounts /usr, not
+# /api) and newton-cdlab-selftest exercises it at image build.
+#
+# USAGE
+#   newton-bundle-split [-r NAME]... [-n MAX_FILES] [-s MAX_BYTES] BUNDLE OUTDIR EXT_REGEX
+#
+#   BUNDLE     the bundle file
+#   OUTDIR     an existing, empty directory to write the files into
+#   EXT_REGEX  extended regex for the allowed extensions, matched against the
+#              whole text after the last '.' of a name, e.g. 'l|y|c|h'
+#   -r NAME    a name the bundle may not use, e.g. a file the build generates
+#              (repeatable; compared ignoring case)
+#   -n N       at most N files (default 32)
+#   -s BYTES   at most BYTES bytes in the whole bundle (default 1048576)
+#
+# EXIT STATUS
+#   0  files written to OUTDIR; their names are printed on stdout, one per
+#      line, in bundle order
+#   1  the bundle is invalid; a plain-English message is on stderr, normally
+#      "bundle line N: ..." (names in it are cut to 80 characters); nothing
+#      is left in OUTDIR
+#   2  usage error
+#   3  the bundle has no marker line at all; nothing is written, so the
+#      caller can decide to treat the whole buffer as a single file
+#
+# BUNDLE FORMAT
+#   Every file starts with a marker line of exactly this shape:
+#       /* ==== FILE: name.ext ==== */
+#   Spaces and tabs are allowed around the tokens /*  ====  FILE:  name  ====  */
+#   and nowhere else; FILE is upper case and each ==== is exactly four '='.
+#   - The lines after a marker, up to the next marker or the end, are that
+#     file. A trailing CR is dropped from every line (CRLF input) and every
+#     file is written newline-terminated, even when the buffer did not end
+#     with one.
+#   - Blank lines before the first marker are ignored (the product composes
+#     pre + "\n" + src + "\n" + post). Any other text there is an error.
+#   - A line that looks like a marker ("/*", some '=', "FILE" in any case,
+#     then ":") but is not exactly a marker is an error, never content. This
+#     also catches a marker glued onto the previous file's last line, and a
+#     marker typed with a no-break space or a fullwidth '=' or ':'. So a
+#     banner comment such as  /*===== File: scanner.l =====*/  is an error
+#     too; the message says so.
+#   - A UTF-8 byte-order mark in front of a marker is ignored.
+#   - Names: [A-Za-z0-9_][A-Za-z0-9_.-]*, at most 64 characters, so no '/',
+#     no leading '.' or '-'; no reserved name (any letter case); the
+#     extension must match EXT_REGEX (case-sensitive: gcc reads .C as C++);
+#     no two names that differ only in case.
+#
+# This script only reads the bundle and writes plain files into OUTDIR. It
+# never executes anything taken from the bundle.
+
+set -u
+export LC_ALL=C   # byte-wise regex classes, lengths and case folding
+
+prog=newton-bundle-split
+usage() {
+    echo "usage: $prog [-r reserved-name]... [-n max-files] [-s max-bytes] BUNDLE OUTDIR EXT_REGEX" >&2
+    exit 2
+}
+
+max_files=32
+max_bytes=1048576
+max_name=64
+reserved=()
+while getopts 'r:n:s:' opt; do
+    case $opt in
+        r) reserved+=("${OPTARG,,}") ;;
+        n) max_files=$OPTARG ;;
+        s) max_bytes=$OPTARG ;;
+        *) usage ;;
+    esac
+done
+shift $((OPTIND - 1))
+[ $# -eq 3 ] || usage
+bundle=$1 outdir=$2 ext_re=$3
+[[ $max_files =~ ^[1-9][0-9]*$ && $max_bytes =~ ^[1-9][0-9]*$ ]] || usage
+[ -n "$ext_re" ] || usage
+rc=0
+[[ x =~ ^($ext_re)$ ]] || rc=$?
+if [ $rc -eq 2 ]; then
+    echo "$prog: EXT_REGEX '$ext_re' is not a valid extended regex" >&2; exit 2
+fi
+if [ ! -f "$bundle" ] || [ ! -r "$bundle" ]; then
+    echo "$prog: cannot read $bundle" >&2; exit 2
+fi
+if [ ! -d "$outdir" ] || [ ! -w "$outdir" ]; then
+    echo "$prog: $outdir is not a writable directory" >&2; exit 2
+fi
+[ -z "$(ls -A -- "$outdir")" ] || { echo "$prog: $outdir is not empty" >&2; exit 2; }
+
+# "l|y|c|h" reads better as ".l, .y, .c, .h" in messages.
+if [[ $ext_re =~ ^[A-Za-z0-9]+(\|[A-Za-z0-9]+)*$ ]]; then
+    allowed=".${ext_re//|/, .}"
+else
+    allowed="names matching /$ext_re/"
+fi
+
+names=()      # file names in bundle order (fail() removes any that exist)
+lines=()      # bundle line of each file's marker
+
+fail() {  # fail <bundle-line or ""> <message>: undo partial output, report, exit 1
+    local f
+    for f in ${names[@]+"${names[@]}"}; do rm -f -- "$outdir/$f"; done
+    if [ -n "$1" ]; then
+        printf 'bundle line %s: %s\n' "$1" "$2" >&2
+    else
+        printf 'bundle: %s\n' "$2" >&2
+    fi
+    exit 1
+}
+
+size=$(wc -c < "$bundle")
+[ "$size" -le "$max_bytes" ] ||
+    fail "" "the submission is $size bytes; the limit is $max_bytes bytes"
+[ "$(tr -d '\000' < "$bundle" | wc -c)" -eq "$size" ] ||
+    fail "" "the submission contains NUL bytes; only text files are supported"
+
+bom=$'\xef\xbb\xbf'
+cr=$'\r'
+ws='[[:blank:]]*'
+# Look-alikes a hand-typed or pasted marker may carry: U+00A0 no-break space,
+# U+3000 ideographic space, U+FF1D fullwidth '=', U+FF1A fullwidth ':'. They
+# only widen the "looks like a marker" test, so such a line is reported as a
+# malformed marker instead of silently becoming content of the previous file.
+wsx="([[:blank:]]|"$'\xc2\xa0'"|"$'\xe3\x80\x80'")*"
+eqx="(=|"$'\xef\xbc\x9d'")+"
+odd_re=$'\xc2\xa0|\xe3\x80\x80|\xef\xbc\x9d|\xef\xbc\x9a'
+# Looks like a marker: same test for grep -E and bash [[ =~ ]].
+looks_re="/\\*${wsx}${eqx}${wsx}[Ff][Ii][Ll][Ee]${wsx}(:|"$'\xef\xbc\x9a'")"
+# Is exactly a marker; capture 1 = the name as written (validated separately
+# so a bad name gets a specific message).
+marker_re="^${ws}/\\*${ws}====${ws}FILE:${ws}([^=]*[^=[:blank:]])${ws}====${ws}\\*/${ws}\$"
+
+# Only marker-like lines are examined in bash, and file bodies are copied by
+# sed, so the time does not grow with the bundle's line count (a bash
+# read-loop over 1 MiB of short lines took over 10 s). grep returns just the
+# line numbers of the first max_files + 1 candidates; any later one could
+# only add an error after "more than max_files files".
+cands=$(grep -anE -m "$((max_files + 1))" -- "$looks_re" "$bundle" | cut -d: -f1
+        exit "${PIPESTATUS[0]}")
+case $? in
+    0) ;;
+    1)
+        echo "bundle: no /* ==== FILE: name ==== */ marker lines" >&2
+        exit 3
+        ;;
+    *) echo "$prog: cannot read $bundle" >&2; exit 2 ;;
+esac
+cand_lines=()
+for n in $cands; do cand_lines+=("$n"); done   # digits only, so no globbing
+
+shorten() {  # shorten <text>: at most 80 characters, for messages
+    if [ ${#1} -gt 80 ]; then printf '%s...' "${1:0:80}"; else printf '%s' "$1"; fi
+}
+
+bundle_line() {  # bundle_line <n>: print line n without a leading BOM or trailing CR
+    # (sed, not ${l%...}: bash pattern removal is quadratic on a long line)
+    sed -n "${1}{s/^$bom//;s/$cr\$//;p;q;}" "$bundle"
+}
+
+name_error() {  # name_error <name>: print why the name is unusable, or nothing
+    local name=$1 shown ext r i
+    shown=$(shorten "$name")
+    if [ ${#name} -gt $max_name ]; then
+        echo "file name \"$shown\" is longer than $max_name characters"; return
+    fi
+    case $name in
+        */*) echo "file name \"$shown\" contains '/'; files cannot be put in folders"; return ;;
+        .*)  echo "file name \"$shown\" must not start with '.'"; return ;;
+        -*)  echo "file name \"$shown\" must not start with '-'"; return ;;
+    esac
+    if ! [[ $name =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+        echo "file name \"$shown\" may only use letters, digits, '_', '.' and '-'"; return
+    fi
+    for r in ${reserved[@]+"${reserved[@]}"}; do
+        if [ "${name,,}" = "$r" ]; then
+            echo "\"$name\" is a reserved name (the build creates or uses a file called $r); rename your file"; return
+        fi
+    done
+    ext=${name##*.}
+    if [[ $name != *.* || -z $ext ]]; then
+        echo "file name \"$name\" needs an extension (allowed: $allowed)"; return
+    fi
+    if ! [[ $ext =~ ^($ext_re)$ ]]; then
+        echo "file name \"$name\": extension .$ext is not allowed here (allowed: $allowed)"; return
+    fi
+    for i in ${names[@]+"${!names[@]}"}; do
+        if [ "${name,,}" = "${names[$i],,}" ]; then
+            echo "two files are named \"${names[$i]}\" (bundle line ${lines[$i]}) and \"$name\"; names must differ by more than letter case. One of them may be a read-only file provided with the problem: rename yours"
+            return
+        fi
+    done
+    if [ ${#names[@]} -ge "$max_files" ]; then
+        echo "more than $max_files files in one submission"; return
+    fi
+}
+
+# Text before the first marker-like line: blank lines (and a BOM) only.
+first=${cand_lines[0]}
+if [ "$first" -gt 1 ]; then
+    n=$(sed -n "1,$((first - 1)){s/^$bom//;s/$cr\$//;/[^[:blank:]]/{=;q;};}" "$bundle")
+    if [ -n "$n" ]; then
+        fail "$n" "text before the first file marker; every file must start with a line like /* ==== FILE: name.ext ==== */ (bundle line $first is read as a file marker: $(shorten "$(bundle_line "$first")"))"
+    fi
+fi
+
+# Validate every candidate, in bundle order, before writing anything.
+for n in "${cand_lines[@]}"; do
+    line=$(bundle_line "$n")
+    if [[ $line =~ $marker_re ]]; then
+        name=${BASH_REMATCH[1]}
+        err=$(name_error "$name")
+        [ -z "$err" ] || fail "$n" "$err"
+        names+=("$name")
+        lines+=("$n")
+        continue
+    fi
+    if [[ $line =~ $odd_re ]]; then
+        fail "$n" "malformed file marker: it contains a non-ASCII space, '=' or ':' (often pasted from a web page or document); a marker must be exactly: /* ==== FILE: name.ext ==== */"
+    fi
+    if [[ $line =~ ^${ws}/\* ]]; then
+        fail "$n" "malformed file marker; a marker must be exactly: /* ==== FILE: name.ext ==== */ (if this line is only a comment, reword it so that it does not look like a marker)"
+    fi
+    fail "$n" "a file marker must be on a line of its own (is a newline missing at the end of the previous file?)"
+done
+
+# Write each file: its lines, one trailing CR dropped from each, always
+# newline-terminated. names[] grows only as files are written, so fail()
+# removes exactly what exists.
+all=("${names[@]}")
+names=()
+for i in "${!all[@]}"; do
+    a=$((lines[i] + 1))
+    out=$outdir/${all[$i]}
+    names+=("${all[$i]}")
+    if [ $((i + 1)) -lt ${#all[@]} ]; then
+        b=$((lines[i + 1] - 1))
+        if [ "$a" -gt "$b" ]; then
+            : > "$out" || fail "${lines[$i]}" "cannot create ${all[$i]}"
+            continue
+        fi
+        script="${a},${b}{s/$cr\$//;p;};${b}q"
+    else
+        script="${a},\${s/$cr\$//;p;}"
+    fi
+    sed -n "$script" "$bundle" > "$out" || fail "${lines[$i]}" "cannot write ${all[$i]}"
+    if [ -n "$(tail -c 1 "$out")" ]; then
+        printf '\n' >> "$out" || fail "${lines[$i]}" "cannot write ${all[$i]}"
+    fi
+done
+
+printf '%s\n' "${names[@]}"
+exit 0

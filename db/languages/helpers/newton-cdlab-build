@@ -1,0 +1,167 @@
+#!/bin/bash
+# newton-cdlab-build - compile step of judge0 language 3010,
+# "C + Lex/Yacc (GCC 9.5.0, Flex 2.6.4, Bison 3.8.2)".
+#
+# Lives in judge0 at db/languages/helpers/ next to active.rb (its only
+# consumer). NewtonDockerfile installs it with newton-bundle-split to
+# /usr/local/bin (isolate mounts /usr, not /api) and runs
+# newton-cdlab-selftest against the compiler image's flex, bison and GCC 9.5
+# (compilers Tier 15, label 0.39+). active.rb runs it as
+#     compile_cmd: "/usr/local/bin/newton-cdlab-build %s"
+#
+# CONTRACT (change together with newton-cdlab-selftest and the 3010 cases in
+# bin/newton-smoke-test)
+#   cwd     the isolate box; the input is ./main.bundle (judge0 source_code).
+#   args    judge0 compiler_options, passed to gcc as-is and never evaluated.
+#   result  ./a.out. Exit 0 = built; non-zero = judge0 Compilation Error. The
+#           build's own outputs (split files, y.tab.*, lex.yy.c) stay in a
+#           private build directory; only a.out is moved into the box. This
+#           is not a sandbox boundary: flex/bison directives that take paths
+#           (%option outfile, %defines "...") can still write elsewhere in
+#           the sandbox, which matters only if 3010 ever declares assets.
+#   output  the build log judge0 stores as compile_output. A stage is shown
+#           as "==> <command>" followed by what it printed, and only when it
+#           printed something or failed, so a clean build prints nothing.
+#   never   runs anything taken from the submission (no make, eval, source or
+#           generated program); the program itself runs only in run_cmd.
+#           bison's %skeleton is rejected: bison feeds the named file to m4,
+#           whose m4_esyscmd would run shell commands from the submission.
+#
+# BUNDLE (split by newton-bundle-split; see its header for the full grammar)
+#   Each file starts with a marker line  /* ==== FILE: name ==== */ .
+#   Allowed: .l .y .c .h; at most one .l and one .y; a pure .c/.h bundle is
+#   fine. Reserved: lex.yy.c y.tab.c y.tab.h y.output a.out main.bundle.
+#   The product composes source_code as pre + "\n" + editor + "\n" + post,
+#   with pre_function_code EMPTY for 3010 (read-only files go in post), so
+#   exactly one leading empty line is dropped first: "bundle line N" in
+#   messages, and main.l:N below, then mean editor line N.
+#   A buffer with no marker at all is ONE lex spec, compiled as main.l (a
+#   leading UTF-8 BOM is dropped). When a problem has read-only files, the
+#   product must start every student tab with a marker: the read-only files'
+#   markers make the buffer a bundle, and unmarked text in front of them is
+#   an error.
+#
+# BUILD (inside the build directory, so diagnostics name the files the way
+# the product's tabs do: yFile3.y:42, lFile3.l:7, cFile3.c:12)
+#   bison -y -d Y.y      -> y.tab.c y.tab.h  (what Debian's `yacc -d` runs)
+#   flex X.l             -> lex.yy.c
+#   gcc <judge0 id 50's lenient flags> <compiler_options>
+#       lex.yy.c y.tab.c <bundle .c files in bundle order> [-ly] [-lfl] -lm -o a.out
+#   -ly only with a .y: liby supplies main() (calls yyparse) and yyerror().
+#   -lfl only with a .l: libfl supplies main() (calls yylex) and yywrap().
+#   -ly comes first, so a lex+yacc program without its own main() gets the
+#   parser's main. A main/yyerror/yywrap defined in the bundle always wins:
+#   library code is only used for symbols that are still undefined.
+
+set -u
+
+CC=/usr/local/gcc-9.5.0/bin/gcc
+FLEX=/usr/bin/flex
+BISON=/usr/bin/bison
+# Copied from judge0 id 50 (C, GCC 9.5.0) in db/languages/active.rb.
+LENIENT=(-Wno-error=implicit-function-declaration -Wno-error=implicit-int
+         -Wno-error=int-conversion -Wno-error=incompatible-pointer-types)
+RESERVED=(lex.yy.c y.tab.c y.tab.h y.output a.out main.bundle)
+
+here=$(cd -- "$(dirname -- "$0")" && pwd)
+SPLIT=$here/newton-bundle-split
+
+die() { printf 'build: %s\n' "$*" >&2; exit 1; }
+
+box=$PWD
+[ -f "$box/main.bundle" ] || die "main.bundle not found in $box"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/cdlab.XXXXXX") || die "cannot create a build directory"
+trap 'rm -rf -- "$work"' EXIT
+src=$work/src
+mkdir "$src" || die "cannot create a build directory"
+
+# Drop the one empty line that composition puts in front of the editor text.
+# Shell text tools run byte-wise (LC_ALL=C); flex and gcc keep judge0's locale.
+LC_ALL=C sed '1{/^\r\{0,1\}$/d;}' "$box/main.bundle" > "$work/bundle" || die "cannot read main.bundle"
+
+ropts=()
+for r in "${RESERVED[@]}"; do ropts+=(-r "$r"); done
+"$SPLIT" "${ropts[@]}" -n 32 -s 1048576 "$work/bundle" "$src" 'l|y|c|h' > "$work/files" 2> "$work/split.err"
+rc=$?
+case $rc in
+    0)
+        mapfile -t files < "$work/files"
+        ;;
+    3)
+        # No marker at all: the whole buffer is one lex specification.
+        LC_ALL=C grep -q '[^[:space:]]' "$work/bundle" || die "the submission is empty"
+        bom=$'\xef\xbb\xbf'
+        LC_ALL=C sed "1s/^$bom//; s/\r\$//" "$work/bundle" > "$src/main.l" ||
+            die "cannot write main.l"
+        if [ -n "$(tail -c 1 "$src/main.l")" ]; then
+            printf '\n' >> "$src/main.l"
+        fi
+        files=(main.l)
+        ;;
+    *)
+        cat "$work/split.err" >&2
+        if LC_ALL=C grep -q 'text before the first file marker' "$work/split.err"; then
+            echo "(If your editor holds a single lex file and the problem provides read-only files, start your file with a marker line such as /* ==== FILE: lexer.l ==== */)" >&2
+        fi
+        exit 1
+        ;;
+esac
+
+lex=() yacc=() csrc=()
+for f in "${files[@]}"; do
+    case $f in
+        *.l) lex+=("$f") ;;
+        *.y) yacc+=("$f") ;;
+        *.c) csrc+=("$f") ;;
+    esac
+done
+[ ${#lex[@]} -le 1 ] || die "a submission can have at most one .l file (found: ${lex[*]})"
+[ ${#yacc[@]} -le 1 ] || die "a submission can have at most one .y file (found: ${yacc[*]})"
+[ $(( ${#lex[@]} + ${#yacc[@]} + ${#csrc[@]} )) -gt 0 ] ||
+    die "nothing to build: the submission has no .l, .y or .c file"
+
+cd "$src" || die "cannot enter the build directory"
+
+# stage <label> <command...>: run one build stage; show "==> label" and the
+# stage's output only if it printed something or failed. Returns its status.
+stage() {
+    local label=$1 rc
+    shift
+    "$@" > "$work/stage.out" 2>&1
+    rc=$?
+    if [ -s "$work/stage.out" ] || [ $rc -ne 0 ]; then
+        printf '==> %s\n' "$label"
+        cat "$work/stage.out"
+        if [ $rc -ne 0 ] && [ ! -s "$work/stage.out" ]; then
+            printf '(failed with exit status %d and no message)\n' "$rc"
+        fi
+    fi
+    return $rc
+}
+
+gen=() libs=()
+if [ ${#yacc[@]} -eq 1 ]; then
+    if LC_ALL=C grep -aq -- '%skeleton' "${yacc[0]}"; then
+        die "${yacc[0]}: %skeleton is not supported; this lane always uses bison's own yacc.c skeleton (remove the %skeleton line)"
+    fi
+    stage "bison -y -d ${yacc[0]}" "$BISON" -y -d "${yacc[0]}" || exit 1
+    if [ ! -f y.tab.c ] || [ ! -f y.tab.h ]; then
+        die "bison did not write y.tab.c and y.tab.h (remove any %output, %defines or %header directive)"
+    fi
+    gen+=(y.tab.c)
+    libs+=(-ly)
+fi
+if [ ${#lex[@]} -eq 1 ]; then
+    stage "flex ${lex[0]}" "$FLEX" "${lex[0]}" || exit 1
+    [ -f lex.yy.c ] || die "flex did not write lex.yy.c (remove any %option outfile)"
+    gen=(lex.yy.c ${gen[@]+"${gen[@]}"})
+    libs+=(-lfl)
+fi
+
+srcs=(${gen[@]+"${gen[@]}"} ${csrc[@]+"${csrc[@]}"})
+label="gcc${*:+ $*} ${srcs[*]}${libs[*]:+ ${libs[*]}} -lm -o a.out"
+stage "$label" "$CC" "${LENIENT[@]}" "$@" "${srcs[@]}" ${libs[@]+"${libs[@]}"} -lm -o a.out || exit 1
+[ -f a.out ] || die "gcc did not write a.out"
+mv -f a.out "$box/a.out" || die "cannot place a.out in $box"
+exit 0

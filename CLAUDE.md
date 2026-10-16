@@ -42,6 +42,7 @@ compilers image). Don't conflate them.
 ├── db/
 │   ├── languages/active.rb          # canonical language id → command map
 │   ├── languages/archived.rb        # historical/dropped languages
+│   ├── languages/helpers/           # sandbox-side compile helpers → /usr/local/bin (3010)
 │   ├── seeds.rb                     # loads active.rb + archived.rb into DB
 │   └── migrate/                     # rails migrations (don't add new ones lightly)
 ├── app/jobs/isolate_job.rb          # the sandbox runner — most complex Ruby in the repo
@@ -151,6 +152,48 @@ language ids exist and what they invoke. Editing it requires a
   GET returns asset metadata when `fields=...,assets`; bytes via
   `GET /submissions/:token/assets/:logical_name`. Full design in
   `docs/superpowers/specs/2026-05-05-submission-assets-design.md`.
+- **C + Lex/Yacc id 3010 (compiler-design lab).** `source_code` is a
+  *bundle*: every file starts with a marker line
+  `/* ==== FILE: name.ext ==== */` (`.l .y .c .h`, at most one `.l` and
+  one `.y`; no marker = the whole buffer is one lex spec). The product
+  shows the files as tabs; read-only instructor files arrive appended via
+  `post_function_code` (composed `pre + "\n" + src + "\n" + post`).
+  `stdin` is the input fed to `./a.out`. `compile_cmd` is just
+  `/usr/local/bin/newton-cdlab-build %s`: it splits the bundle **inside
+  the sandbox** with the generic `newton-bundle-split`, then runs
+  `bison -y -d` → `flex` → GCC 9.5 with id 50's lenient flags (+
+  `compiler_options`, `-ly`/`-lfl`/`-lm`). Both helpers live in
+  `db/languages/helpers/`; `NewtonDockerfile` installs them to
+  `/usr/local/bin` (isolate mounts `/usr`, not `/api`) and runs
+  `newton-cdlab-selftest`, which needs compilers Tier 15 (label 0.39+) —
+  the build fails on an older base by design. `compile_output` is a
+  stage log: `==> bison -y -d yFile3.y` etc. appears only for a stage
+  that printed something or failed, and diagnostics carry bare file names
+  (`yFile3.y:42`) matching the tabs. Rules for problem authors and the
+  product:
+  - `pre_function_code` must be **empty**; locked files go in
+    `post_function_code`. The build drops exactly one leading blank line
+    (the one composition adds) so marker-less flex errors say `main.l:N`
+    for editor line N; a non-empty pre shifts that, and a marked pre
+    silently swallows a marker-less student file.
+  - When a problem has locked files, every student tab must start with a
+    marker; a marker-less tab in front of marked locked files is a
+    Compilation Error ("text before the first file marker").
+  - `post_function_code` is sent to the browser, so locked files must never
+    contain solutions; check new locked files with `newton-bundle-split`.
+  - A line that *looks* like a marker (`/*`, some `=`, `FILE` in any case,
+    `:`; also with a no-break space or fullwidth `=`/`:`) but is not exact
+    is a hard error, never content — so a banner comment like
+    `/*===== File: scanner.l =====*/` fails the build; the message says
+    to reword it.
+  - bison `%skeleton` is refused (bison runs the named file through m4,
+    which could run shell commands at compile time).
+  - Capture `expected_output` by running the reference solution through
+    3010 (the lab handout's sample output is not reproducible as written).
+
+  Keep `%` out of `compile_cmd` apart from the single `%s` —
+  `bin/lint-active-rb` checks it (it runs at image build; CI has no PR
+  job, so run it locally before merging).
 
 ## Build commands
 
@@ -200,8 +243,8 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world or equivalent behavioral smoke for every active language
-id. Expected after `man` support on top of 0.76:
-**32 PASS / 0 FAIL / 0 SKIP** on amd64; **30 PASS / 0 FAIL / 2 SKIP** on
+id. Expected after `man` support on top of 0.76, plus the four 3010 cases:
+**36 PASS / 0 FAIL / 0 SKIP** on amd64; **34 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
 CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
 contributes three (hello-world, `man`, `whatis`).
@@ -211,6 +254,13 @@ comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
 validation; use `bin/newton-smoke-test`.
 
 ## judge0.conf knobs
+
+`judge0.conf` is the dev/local config only — `.dockerignore` keeps it out
+of the image. Production runs two separate stacks configured from k8s
+secrets: `judge0-config` (judge0-api/-worker, newton-api Submit) and
+`judge0-public-config` (judge0-public-api/-worker, the SPA's Run), each
+with its own Postgres that re-seeds `languages` on boot. A new language
+must reach both stacks, and smoke tests should hit both endpoints.
 
 Newton overrides on top of upstream defaults. Comments inline
 in `judge0.conf` explain each. Summary:

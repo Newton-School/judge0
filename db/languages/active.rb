@@ -275,5 +275,31 @@
       { name: "devices.json", identification: '\Aartifacts/devices\.json\z', max_size: 102_400 },
       { name: "timing.json", identification: '\Aartifacts/timing\.json\z', max_size: 102_400 }
     ]
+  },
+  # Compiler-design lab: flex/bison/C programs built from several files.
+  # source_code is a "bundle": each file starts with a marker line
+  #   /* ==== FILE: name.ext ==== */
+  # (.l .y .c .h; at most one .l and one .y). The product shows the files as
+  # tabs and joins them; read-only instructor files arrive appended through
+  # post_function_code. A buffer with no marker is a single lex spec.
+  # Product contract: pre_function_code stays EMPTY (the build drops exactly
+  # one leading blank line so flex line numbers match the editor), and when
+  # a problem has read-only files every student tab starts with a marker.
+  # stdin is the input fed to ./a.out. The compile step, newton-cdlab-build,
+  # splits the bundle inside the sandbox (via the generic
+  # newton-bundle-split), runs bison -y -d (%skeleton is refused), flex and
+  # GCC 9.5 with id 50's lenient flags, and links -ly/-lfl/-lm. Both helpers
+  # live in db/languages/helpers/ and are installed to /usr/local/bin by
+  # NewtonDockerfile, which also runs newton-cdlab-selftest. Needs
+  # flex/bison/libfl/liby from compilers Tier 15 (image label 0.39+).
+  # compile_cmd goes through Ruby String#%: keep the single %s and no other
+  # % in it.
+  {
+    id: 3010,
+    name: "C + Lex/Yacc (GCC 9.5.0, Flex 2.6.4, Bison 3.8.2)",
+    is_archived: false,
+    source_file: "main.bundle",
+    compile_cmd: "/usr/local/bin/newton-cdlab-build %s",
+    run_cmd: "./a.out"
   }
 ]
