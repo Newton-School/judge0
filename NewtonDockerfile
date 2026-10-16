@@ -1,8 +1,10 @@
 # Compiler base is pinned to the commit SHA the compilers CI actually pushes;
 # the 0.3x numbers in that repo are a doc convention, not published tags.
-# da70ed9 = Newton-School/compilers#22 (CircuitRun dist with arduino-cli capped
-# at --jobs 4 / GOMAXPROCS=4; on top of #21's man-db Tier 14).
-FROM newtonschool/judge0-newton-compiler:da70ed9d8b21d677c04c5c82c2aaf59e77a9d155 AS production
+# f8f215e = Newton-School/compilers#23 (label 0.39): Tier 15 flex/bison +
+# libfl/liby for the C + Lex/Yacc lane 3010, on top of #22's CircuitRun
+# arduino-cli cap and #21's man-db Tier 14. Built from that PR head and
+# pushed as :<sha> and :0.39 (digest sha256:e7ffeab5…).
+FROM newtonschool/judge0-newton-compiler:f8f215eac832b9a34223302e7322c1e37b588bbc AS production
 
 
 ENV JUDGE0_HOMEPAGE "https://judge0-public.newtonschool.co/"
@@ -115,8 +117,8 @@ RUN RAILS_ENV=production bundle
 # The self-test builds and runs real flex/bison/GCC 9.5 programs, so this
 # layer REQUIRES compilers Tier 15 (flex, bison, libfl-dev, libbison-dev,
 # m4; image label 0.39+) and fails the build on an older compiler base BY
-# DESIGN: an image whose 3010 lane cannot compile is never produced. Bump
-# the FROM line to a Tier 15 compilers SHA together with this step.
+# DESIGN: an image whose 3010 lane cannot compile is never produced. Keep
+# the FROM line on a Tier 15 compilers SHA.
 # The whole directory is copied, so any helper active.rb names (the lint
 # below checks it is in db/languages/helpers/) is in the image too.
 COPY db/languages/helpers/ /usr/local/bin/
