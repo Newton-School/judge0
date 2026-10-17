@@ -161,15 +161,19 @@ _check_resp() {
 
 # t_ce <name> <language_id> <source_code> <compile_output_substring>
 # Expects status "Compilation Error" with the substring in compile_output.
+# Uses base64_encoded=true both ways, like the product: the compiler image
+# runs with LC_ALL=en_US.UTF-8, so bison/gcc diagnostics carry UTF-8 quotes
+# (‘…’), and judge0 cannot render any non-ASCII output as plain JSON (it
+# returns "cannot be converted to UTF-8" with no status instead).
 t_ce() {
     local name="$1" lid="$2" src="$3" expected="$4"
     local payload resp status co
     payload="$(jq -nc --arg sc "$src" --argjson lid "$lid" \
-        '{language_id:$lid, source_code:$sc}')"
-    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output" \
+        '{language_id:$lid, source_code:($sc|@base64)}')"
+    resp="$(curl -s -X POST "${URL}/submissions?base64_encoded=true&wait=true&fields=stdout,stderr,status,message,compile_output" \
         -H 'Content-Type: application/json' -d "$payload")"
     status="$(echo "$resp" | jq -r '.status.description // "?"')"
-    co="$(echo "$resp" | jq -r '.compile_output // ""')"
+    co="$(echo "$resp" | jq -r '.compile_output // ""' | base64 -d 2>/dev/null)"
     if [[ "$status" == "Compilation Error" && "$co" == *"$expected"* ]]; then
         printf "  \033[32mPASS\033[0m  %s\n" "$name"
         PASS=$((PASS+1))

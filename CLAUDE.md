@@ -249,6 +249,15 @@ arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
 CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
 contributes three (hello-world, `man`, `whatis`).
 
+**Plain-text API mode cannot return non-ASCII output.** judge0 stores
+stdout/stderr/compile_output base64-encoded and decodes them as binary,
+so without `base64_encoded=true` any byte above 0x7F fails the response
+("cannot be converted to UTF-8", HTTP 201 with only `token` + `error`).
+The compiler image runs with `LC_ALL=en_US.UTF-8`, so gcc/bison
+diagnostics quote with `‘…’` and every compile error trips this. The
+product always sends `base64_encoded=true`; smoke checks that read
+compile errors (`t_ce`) must too.
+
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
 validation; use `bin/newton-smoke-test`.
