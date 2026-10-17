@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "f3a8c2e1-9d4b-4b6f-a7e2-5c1d8e9f0a01",
-    "name": "Newton Judge0 — All Languages (0.67)",
-    "description": "End-to-end smoke for every active language id in db/languages/active.rb.\nMirrors bin/newton-smoke-test as importable Postman requests.\n\nUsage:\n  1. Import this file in Postman.\n  2. Edit the collection variable `base_url` to point at your environment\n     (e.g. http://localhost:2358 for dev, https://judge0.newtonschool.co for prod).\n  3. Run individual requests, or use the Collection Runner to execute all.\n\nAll requests use `?wait=true` so the response is the final submission result\n(no polling loop). Each request has a Tests script that asserts:\n  - HTTP 201\n  - status.description === \"Accepted\"\n  - stdout contains the language-specific success text, usually \"Hello, Newton!\"\n  - asset metadata exists for asset-producing languages such as CircuitRun\n\nOnly currently-active languages are tested here. See db/languages/archived.rb\nfor retired ids — submitting any of those returns a 422 'language is archived'.",
+    "name": "Newton Judge0 — All Languages",
+    "description": "End-to-end smoke for every active language id in db/languages/active.rb.\nMirrors bin/newton-smoke-test as importable Postman requests.\n\nUsage:\n  1. Import this file in Postman.\n  2. Edit the collection variable `base_url` to point at your environment\n     (e.g. http://localhost:2358 for dev, https://judge0-public.newtonschool.co for the prod public stack).\n  3. Run individual requests, or use the Collection Runner to execute all.\n\nAll requests use `?wait=true` so the response is the final submission result\n(no polling loop). Each request has a Tests script that asserts:\n  - status.description === \"Accepted\"\n  - stdout contains the language-specific success text, usually \"Hello, Newton!\"\n  - asset metadata exists for asset-producing languages such as CircuitRun\n\nThe one negative case, the 3010 grammar error, asserts \"Compilation Error\"\ninstead and uses base64_encoded=true (see its request description).\n\nOnly currently-active languages are tested here. See db/languages/archived.rb\nfor retired ids — submitting any of those returns a 422 'language is archived'.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -377,6 +377,53 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output,assets", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output,assets"}]},
             "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3009,\n  \"memory_limit\": 256000,\n  \"source_code\": \"void setup() {\\n  pinMode(13, OUTPUT);\\n}\\n\\nvoid loop() {\\n  digitalWrite(13, HIGH);\\n  delay(100);\\n  digitalWrite(13, LOW);\\n  delay(100);\\n}\",\n  \"stdin\": \"{\\n  \\\"schema_version\\\": \\\"2026-05-01\\\",\\n  \\\"mode\\\": \\\"evaluate\\\",\\n  \\\"embedded_system\\\": {\\n    \\\"schema_version\\\": \\\"2026-05-01\\\",\\n    \\\"parts\\\": [],\\n    \\\"nets\\\": []\\n  },\\n  \\\"scenario\\\": {\\n    \\\"duration_ms\\\": 1000,\\n    \\\"stimuli\\\": []\\n  },\\n  \\\"checks\\\": [\\n    {\\n      \\\"type\\\": \\\"pin-toggled\\\",\\n      \\\"id\\\": \\\"led-blinks\\\",\\n      \\\"pin\\\": \\\"D13\\\",\\n      \\\"min_count\\\": 2\\n    }\\n  ],\\n  \\\"artifacts\\\": {\\n    \\\"enabled\\\": [\\\"result.json\\\", \\\"waveform.json\\\", \\\"serial.log\\\"]\\n  },\\n  \\\"limits\\\": {\\n    \\\"max_wall_ms\\\": 20000\\n  },\\n  \\\"context\\\": {\\n    \\\"question_id\\\": \\\"judge0-postman\\\",\\n    \\\"test_case_id\\\": \\\"arduino-uno-arduino-cpp\\\"\\n  }\\n}\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Compiler-design lab (3010)",
+      "description": "C + Lex/Yacc lane 3010 (compiler-design lab). source_code is a bundle: each file starts with a marker line /* ==== FILE: name.ext ==== */ (.l .y .c .h; at most one .l and one .y), and a buffer with no marker is a single lex spec. stdin is the input fed to ./a.out. The product shows the files as tabs; read-only instructor files are appended through post_function_code (pre_function_code stays empty), and judge0 receives pre + \"\\n\" + src + \"\\n\" + post, which is why the marked bundles here start with a newline. Mirrors the 3010 cases in bin/newton-smoke-test.",
+      "item": [
+        {
+          "name": "Lex only, no marker (3010)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"tokens\", () => pm.expect(pm.response.json().stdout).to.include(\"ID(x) OP(=) NUM(42) OP(;)\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3010,\n  \"source_code\": \"%%\\n[0-9]+                  printf(\\\"NUM(%s) \\\", yytext);\\n[A-Za-z_][A-Za-z0-9_]*  printf(\\\"ID(%s) \\\", yytext);\\n[ \\\\t\\\\r\\\\n]+              ;\\n.                       printf(\\\"OP(%s) \\\", yytext);\\n%%\",\n  \"stdin\": \"x = 42;\"\n}"}
+          }
+        },
+        {
+          "name": "Lex + Yacc calculator (3010)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"value\", () => pm.expect(pm.response.json().stdout).to.include(\"value = 14\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3010,\n  \"source_code\": \"\\n/* ==== FILE: calc.y ==== */\\n%{\\n#include <stdio.h>\\nint yylex(void);\\nint yyerror(const char *s);\\n%}\\n%token NUM\\n%left '+'\\n%left '*'\\n%%\\nline : expr '\\\\n' { printf(\\\"value = %d\\\\n\\\", $1); } ;\\nexpr : NUM\\n     | expr '+' expr { $$ = $1 + $3; }\\n     | expr '*' expr { $$ = $1 * $3; }\\n     ;\\n%%\\n/* ==== FILE: calc.l ==== */\\n%{\\n#include <stdlib.h>\\n#include \\\"y.tab.h\\\"\\n%}\\n%%\\n[0-9]+   { yylval = atoi(yytext); return NUM; }\\n[ \\\\t]    ;\\n\\\\n       { return '\\\\n'; }\\n.        { return yytext[0]; }\\n%%\",\n  \"stdin\": \"2+3*4\\n\"\n}"}
+          }
+        },
+        {
+          "name": "Multi-file C bundle (3010)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"stdout\", () => pm.expect(pm.response.json().stdout).to.include(\"Hello, Newton!\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/submissions?wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3010,\n  \"source_code\": \"\\n/* ==== FILE: main.c ==== */\\n#include \\\"greet.h\\\"\\nint main(void) { greet(\\\"Newton\\\"); return 0; }\\n/* ==== FILE: greet.h ==== */\\nvoid greet(const char *who);\\n/* ==== FILE: greet.c ==== */\\n#include <stdio.h>\\n#include \\\"greet.h\\\"\\nvoid greet(const char *who) { printf(\\\"Hello, %s!\\\\n\\\", who); }\"\n}"}
+          }
+        },
+        {
+          "name": "Grammar error -> Compilation Error (3010)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.test(\"Compilation Error\", () => pm.expect(body.status.description).to.eql(\"Compilation Error\"));", "pm.test(\"compile_output names bad.y:3\", () => pm.expect(atob((body.compile_output || \"\").replace(/\\s/g, \"\"))).to.include(\"bad.y:3.\"));"]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "description": "Sent with base64_encoded=true: source_code below is base64, and compile_output comes back base64 (wrapped every 60 characters; the test strips the line breaks before atob). bison and gcc run under LC_ALL=en_US.UTF-8 and quote with UTF-8 curly quotes, and judge0's plain-text mode cannot return any non-ASCII output: it answers HTTP 201 with only token + error (\"... cannot be converted to UTF-8\") and no status. The product always sends base64_encoded=true; do the same for any 3010 request that may fail to compile.\n\nDecoded source_code (bison rejects the stray \"::\" on line 3 of bad.y):\n\n/* ==== FILE: bad.y ==== */\n%token NUM\n%%\ns : NUM ::\n  ;\n%%",
+            "url": {"raw": "{{base_url}}/submissions?base64_encoded=true&wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "base64_encoded", "value": "true"}, {"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
+            "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3010,\n  \"source_code\": \"Ci8qID09PT0gRklMRTogYmFkLnkgPT09PSAqLwoldG9rZW4gTlVNCiUlCnMgOiBOVU0gOjoKICA7CiUl\"\n}"}
           }
         }
       ]

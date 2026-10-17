@@ -5,25 +5,67 @@
 #   bundle exec ruby bin/lint-active-rb
 #   ./bin/lint-active-rb                    # if executable
 #
-# Intended to run in CI before `docker push` so malformed asset or env
-# declarations are caught at PR time, not at container boot. The same
-# validators also run in db/seeds.rb (Layer 1, runtime safety) — this
-# script is the Layer 2 / pre-merge gate.
+# Pure Ruby (no gems, no Rails), so NewtonDockerfile also runs it at image
+# build. CI has no PR job (the build workflows are workflow_dispatch only),
+# so that fails the next image build, not the merge: run it locally before
+# merging. The same asset and env validators also run in db/seeds.rb
+# (Layer 1, runtime safety) — this script is Layer 2. On top of them it checks:
+#   - ids are unique across active.rb and archived.rb (seeds loads both);
+#   - every active record has id, name, source_file and run_cmd;
+#   - compile_cmd survives IsolateJob's `compile_cmd % compiler_options`
+#     (a stray `%` makes every submission of that language an Internal Error;
+#     write a literal percent as `%%`);
+#   - every /usr/local/bin/newton-* helper a command names is versioned,
+#     executable, in db/languages/helpers/ (NewtonDockerfile installs that
+#     whole directory to /usr/local/bin).
 #
 # Per docs/superpowers/specs/2026-05-05-submission-assets-design.md.
 
+require_relative "../db/languages/archived"
+archived = @languages
+@languages = []
 require_relative "../db/languages/active"
 require_relative "../db/languages/asset_validator"
 require_relative "../db/languages/env_validator"
+
+HELPERS_DIR = File.expand_path("../db/languages/helpers", __dir__)
+HELPER_RE = %r{/usr/local/bin/(newton-[A-Za-z0-9_.-]+)}
 
 errors = @languages.flat_map do |lang|
   AssetValidator.validate_language(lang) + EnvValidator.validate_language(lang)
 end
 
+(archived + @languages).group_by { |l| l[:id] }.each do |id, langs|
+  next if langs.size == 1
+  errors << "id #{id.inspect} is used #{langs.size} times (active.rb + archived.rb): #{langs.map { |l| l[:name].inspect }.join(', ')}"
+end
+
+@languages.each do |lang|
+  prefix = "lang #{lang[:id]} (#{lang[:name].inspect})"
+
+  missing = %i[id name source_file run_cmd].select { |k| lang[k].nil? || lang[k].to_s.strip.empty? }
+  errors << "#{prefix}: missing #{missing.join(', ')}" if missing.any?
+
+  if lang[:compile_cmd]
+    begin
+      lang[:compile_cmd] % "-DLINT_PROBE"
+    rescue ArgumentError, TypeError => e
+      errors << "#{prefix}: compile_cmd % compiler_options fails (#{e.message}); write a literal percent as %%"
+    end
+  end
+
+  [lang[:compile_cmd], lang[:run_cmd]].compact.join(" ").scan(HELPER_RE).flatten.uniq.each do |helper|
+    path = File.join(HELPERS_DIR, helper)
+    unless File.file?(path) && File.executable?(path)
+      errors << "#{prefix}: uses /usr/local/bin/#{helper} but db/languages/helpers/#{helper} is missing or not executable"
+    end
+  end
+end
+
 if errors.empty?
   asset_count = @languages.sum { |l| Array(l[:assets]).size }
   env_count   = @languages.sum { |l| Array(l[:env]).size }
-  puts "OK — #{@languages.count} languages, #{asset_count} asset declarations, #{env_count} env declarations validated."
+  puts "OK — #{@languages.count} languages (+#{archived.count} archived), #{asset_count} asset declarations, #{env_count} env declarations validated."
   exit 0
 else
   warn "active.rb has #{errors.size} problem(s):"

@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:da70ed9d8b21…` | what we layer on; compilers CI tags by commit SHA, not semver |
+| Compiler base | `newtonschool/judge0-newton-compiler:f8f215eac832…` (label 0.39) | what we layer on; compilers CI tags by commit SHA, not semver |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -37,11 +37,15 @@ compilers image). Don't conflate them.
 │   ├── load-config                  # sources judge0.conf, sets RAILS env
 │   └── dev/{shell,bundle,clean,...} # dev helpers
 ├── bin/
-│   ├── newton-smoke-test            # 20-language end-to-end smoke test (post-trim)
+│   ├── newton-smoke-test            # end-to-end smoke, every active language id (36 checks on amd64)
+│   ├── newton-postman.json          # Postman mirror of newton-smoke-test (same sections + case names)
+│   ├── newton-bounds-test           # HELLO / TLE / OOM enforcement probes, sync + async
+│   ├── lint-active-rb               # active.rb + archived.rb lint (also runs at image build)
 │   └── agricius                     # release tarball generator (rare use)
 ├── db/
 │   ├── languages/active.rb          # canonical language id → command map
 │   ├── languages/archived.rb        # historical/dropped languages
+│   ├── languages/helpers/           # sandbox-side compile helpers → /usr/local/bin (3010)
 │   ├── seeds.rb                     # loads active.rb + archived.rb into DB
 │   └── migrate/                     # rails migrations (don't add new ones lightly)
 ├── app/jobs/isolate_job.rb          # the sandbox runner — most complex Ruby in the repo
@@ -151,6 +155,48 @@ language ids exist and what they invoke. Editing it requires a
   GET returns asset metadata when `fields=...,assets`; bytes via
   `GET /submissions/:token/assets/:logical_name`. Full design in
   `docs/superpowers/specs/2026-05-05-submission-assets-design.md`.
+- **C + Lex/Yacc id 3010 (compiler-design lab).** `source_code` is a
+  *bundle*: every file starts with a marker line
+  `/* ==== FILE: name.ext ==== */` (`.l .y .c .h`, at most one `.l` and
+  one `.y`; no marker = the whole buffer is one lex spec). The product
+  shows the files as tabs; read-only instructor files arrive appended via
+  `post_function_code` (composed `pre + "\n" + src + "\n" + post`).
+  `stdin` is the input fed to `./a.out`. `compile_cmd` is just
+  `/usr/local/bin/newton-cdlab-build %s`: it splits the bundle **inside
+  the sandbox** with the generic `newton-bundle-split`, then runs
+  `bison -y -d` → `flex` → GCC 9.5 with id 50's lenient flags (+
+  `compiler_options`, `-ly`/`-lfl`/`-lm`). Both helpers live in
+  `db/languages/helpers/`; `NewtonDockerfile` installs them to
+  `/usr/local/bin` (isolate mounts `/usr`, not `/api`) and runs
+  `newton-cdlab-selftest`, which needs compilers Tier 15 (label 0.39+) —
+  the build fails on an older base by design. `compile_output` is a
+  stage log: `==> bison -y -d yFile3.y` etc. appears only for a stage
+  that printed something or failed, and diagnostics carry bare file names
+  (`yFile3.y:42`) matching the tabs. Rules for problem authors and the
+  product:
+  - `pre_function_code` must be **empty**; locked files go in
+    `post_function_code`. The build drops exactly one leading blank line
+    (the one composition adds) so marker-less flex errors say `main.l:N`
+    for editor line N; a non-empty pre shifts that, and a marked pre
+    silently swallows a marker-less student file.
+  - When a problem has locked files, every student tab must start with a
+    marker; a marker-less tab in front of marked locked files is a
+    Compilation Error ("text before the first file marker").
+  - `post_function_code` is sent to the browser, so locked files must never
+    contain solutions; check new locked files with `newton-bundle-split`.
+  - A line that *looks* like a marker (`/*`, some `=`, `FILE` in any case,
+    `:`; also with a no-break space or fullwidth `=`/`:`) but is not exact
+    is a hard error, never content — so a banner comment like
+    `/*===== File: scanner.l =====*/` fails the build; the message says
+    to reword it.
+  - bison `%skeleton` is refused (bison runs the named file through m4,
+    which could run shell commands at compile time).
+  - Capture `expected_output` by running the reference solution through
+    3010 (the lab handout's sample output is not reproducible as written).
+
+  Keep `%` out of `compile_cmd` apart from the single `%s` —
+  `bin/lint-active-rb` checks it (it runs at image build; CI has no PR
+  job, so run it locally before merging).
 
 ## Build commands
 
@@ -200,17 +246,40 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world or equivalent behavioral smoke for every active language
-id. Expected after `man` support on top of 0.76:
-**32 PASS / 0 FAIL / 0 SKIP** on amd64; **30 PASS / 0 FAIL / 2 SKIP** on
+id. Expected after `man` support on top of 0.76, plus the four 3010 cases:
+**36 PASS / 0 FAIL / 0 SKIP** on amd64; **34 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
 CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
 contributes three (hello-world, `man`, `whatis`).
+
+Two companions move with the smoke test when a language is added:
+`bin/newton-postman.json` mirrors its cases as importable Postman requests
+(folders follow the smoke sections, same case names), and
+`bin/newton-bounds-test` probes HELLO / TLE (`cpu_time_limit=1`) / OOM
+(64 MB cap, 200 MB alloc) per language in sync and async mode — 66 probes
+per mode with 3010 (24 HELLO + 23 TLE + 18 OOM + 1 CircuitRun low-memory).
+
+**Plain-text API mode cannot return non-ASCII output.** judge0 stores
+stdout/stderr/compile_output base64-encoded and decodes them as binary,
+so without `base64_encoded=true` any byte above 0x7F fails the response
+("cannot be converted to UTF-8", HTTP 201 with only `token` + `error`).
+The compiler image runs with `LC_ALL=en_US.UTF-8`, so gcc/bison
+diagnostics quote with `‘…’` and every compile error trips this. The
+product always sends `base64_encoded=true`; smoke checks that read
+compile errors (`t_ce`, and the Postman grammar-error request) must too.
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
 validation; use `bin/newton-smoke-test`.
 
 ## judge0.conf knobs
+
+`judge0.conf` is the dev/local config only — `.dockerignore` keeps it out
+of the image. Production runs two separate stacks configured from k8s
+secrets: `judge0-config` (judge0-api/-worker, newton-api Submit) and
+`judge0-public-config` (judge0-public-api/-worker, the SPA's Run), each
+with its own Postgres that re-seeds `languages` on boot. A new language
+must reach both stacks, and smoke tests should hit both endpoints.
 
 Newton overrides on top of upstream defaults. Comments inline
 in `judge0.conf` explain each. Summary:
@@ -274,26 +343,36 @@ in `judge0.conf` explain each. Summary:
   bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
   for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
   `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
-  28/0/0 on amd64.
+  was 28/0/0 at 0.76; it is 36/0/0 on amd64 with lane 3010 (see
+  "End-to-end smoke test").
 - **The compiler base is pinned by commit SHA, not semver.** The compilers
   workflow pushes `judge0-newton-compiler:<git-sha>` and `:latest` only; the
   `0.35`/`0.36` tags on Docker Hub were hand-pushed months ago, and the
   `0.3x` numbering now lives solely in that repo's
   `org.opencontainers.image.version` label — a semver tag for a new build
   will not exist. `NewtonDockerfile` currently pins
-  `da70ed9d8b21d677c04c5c82c2aaf59e77a9d155` (Newton-School/compilers#22,
-  which caps CircuitRun's arduino-cli at `--jobs 4` / `GOMAXPROCS=4` so
-  Arduino builds fit isolate's RLIMIT_NPROC; #21 before it added man-db
-  for the Bash lane). Both workflows here
+  `f8f215eac832b9a34223302e7322c1e37b588bbc` (Newton-School/compilers#23,
+  label 0.39: Tier 15 flex/bison/libfl/liby for lane 3010). That image was
+  built by hand from the PR head on the build box and pushed as `:<sha>`
+  and `:0.39` (same digest, `sha256:e7ffeab5…`), not by the compilers
+  workflow. It sits on #22, which caps CircuitRun's arduino-cli at
+  `--jobs 4` / `GOMAXPROCS=4` so Arduino builds fit isolate's
+  RLIMIT_NPROC, and #21, which added man-db for the Bash lane. Both workflows here
   likewise push `newton-judge0:<git-sha>` and `:latest`, so the version
   numbers elsewhere in this file are a local-build convention rather than
   anything CI produces.
-- Production runs `newton-judge0:0.76` from ECR
-  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-17.
-  Smoke green against `https://judge0-public.newtonschool.co`
-  (28/0/0 — three C# lanes on top of Phase 3). Deploys are **single-image** (no
-  docker-compose); the deployed `newton-judge0:<tag>` connects to managed
-  Postgres + managed Redis from the environment.
+- Production is two stacks (see "judge0.conf knobs"), each pinned to an
+  ECR image by git SHA (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:<sha>`,
+  set in kubernetes-cluster-infra `clusters/newton-core/base/code-compiler/deployment.yaml`).
+  As of 2026-10-17 the public stack (`judge0-public-api/-worker`) runs
+  `judge0:f4dd691cea8c…` (lane 3010 on compiler base f8f215e / label 0.39;
+  smoke 36/0/0 against `https://judge0-public.newtonschool.co`), and the
+  private stack (`judge0-api/-worker`, newton-api Submit) still runs
+  `judge0:82747e1ad547…` (no 3010) until 3010 is registered product-side.
+  Prod ECR images are pushed by hand from the build box; staging pulls
+  Docker Hub `newtonschool/newton-judge0:<sha>`. Deploys are
+  **single-image** (no docker-compose); the deployed image connects to
+  managed Postgres + managed Redis from the environment.
 - **AL2 → AL2023 NodeClass flip is done.** The karpenter `code-compiler`
   NodeClass moved to `amiFamily: AL2023` ahead of the 0.67 deploy, so
   `docker-entrypoint.sh`'s cgroup-v2 setup is active in prod and the

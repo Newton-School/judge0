@@ -21,6 +21,14 @@
 #   - 3009 CircuitRun — uses a valid scenario payload for HELLO/TLE and low-memory
 #                       probes. TLE/low-memory validate Judge0 enforcement around the
 #                       CircuitRun runner, not arbitrary firmware looping or MCU SRAM OOM.
+#   - 3010 C + Lex/Yacc — HELLO is a marked lex spec (bundle split + flex + libfl's
+#                         main); TLE/OOM are C_TLE/C_OOM as one-file .c bundles, so
+#                         they bound the built a.out like id 50, not bison/flex/gcc
+#                         (compile runs under judge0's MAX_* limits). No Compilation
+#                         Error probe: plain-text mode can't return gcc's UTF-8 quotes
+#                         (a 3010 CE here reads as status '?' in sync mode and as a
+#                         poll timeout in async); bin/newton-smoke-test checks it with
+#                         base64_encoded=true.
 #   - 43 Plain Text — HELLO only (cat-based; can't busy-loop or alloc).
 #   - 45 NASM   — HELLO + TLE  (raw-asm OOM via brk/mmap is impractical here)
 #   - 46 Bash   — HELLO + TLE  (bash mass-alloc is awkward)
@@ -320,6 +328,25 @@ CIRCUITRUN_ARDUINO_STDIN='{
   }
 }'
 
+# C + Lex/Yacc 3010 — source_code is a bundle of files, each starting with a
+# "/* ==== FILE: name ==== */" marker line; the product sends pre + "\n" +
+# editor + "\n" + post, so each bundle starts with a newline. TLE/OOM are
+# C_TLE/C_OOM above as a one-file .c bundle.
+CDLAB_HELLO='
+/* ==== FILE: hello.l ==== */
+%%
+[A-Za-z]+   printf("Hello, %s!\n", yytext);
+.|\n        ;
+%%'
+CDLAB_HELLO_STDIN='Newton'
+# Built from C_TLE / C_OOM so the 3010 probes stay identical to id 50's.
+CDLAB_TLE="
+/* ==== FILE: main.c ==== */
+$C_TLE"
+CDLAB_OOM="
+/* ==== FILE: main.c ==== */
+$C_OOM"
+
 # ── plan ──
 TLE_OPTS='{"cpu_time_limit":1,"wall_time_limit":5}'
 OOM_OPTS='{"memory_limit":65536}'   # 64 MB cap; programs alloc 200 MB
@@ -357,6 +384,7 @@ for mode in sync async; do
   run "Python ML 2000"   "$mode" 'Accepted' 2000 "$PY_HELLO"
   run "MIPS 3001"        "$mode" 'Accepted' 3001 "$MIPS_HELLO"
   run "CircuitRun 3009" "$mode" 'Accepted' 3009 "$CIRCUITRUN_ARDUINO_HELLO" '{}' "$CIRCUITRUN_ARDUINO_STDIN" 'CIRCUITRUN_EVALUATE_ACCEPTED'
+  run "C+Lex/Yacc 3010"  "$mode" 'Accepted' 3010 "$CDLAB_HELLO" '{}' "$CDLAB_HELLO_STDIN" 'Hello, Newton!'
 
   echo "── TLE: cpu_time_limit=1, busy loop ──"
   run "NASM TLE"         "$mode" 'Time Limit'  45   "$NASM_TLE"    "$TLE_OPTS"
@@ -381,6 +409,7 @@ for mode in sync async; do
   run "Python ML TLE"    "$mode" 'Time Limit'  2000 "$PY_TLE"      "$TLE_OPTS"
   run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"    "$TLE_OPTS"
   run "CircuitRun TLE" "$mode" 'Time Limit' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$TLE_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
+  run "C+Lex/Yacc TLE"   "$mode" 'Time Limit'  3010 "$CDLAB_TLE"   "$TLE_OPTS"
 
   echo "── OOM: memory_limit=65536 (64 MB), alloc 200 MB ──"
   run "FreeBASIC OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 47   "$FBASIC_OOM"  "$OOM_OPTS"
@@ -400,6 +429,7 @@ for mode in sync async; do
   run "C# .NET 8 OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 3008 "$CSHARP_OOM"  "$OOM_OPTS"
   run "Node OOM"         "$mode" 'Runtime Error|Memory Limit|Killed' 1999 "$NODE_OOM"    "$OOM_OPTS"
   run "Python ML OOM"    "$mode" 'Runtime Error|Memory Limit|Killed' 2000 "$PY_OOM"      "$OOM_OPTS"
+  run "C+Lex/Yacc OOM"   "$mode" 'Runtime Error|Memory Limit|Killed' 3010 "$CDLAB_OOM"   "$OOM_OPTS"
 
   echo "── CircuitRun low-memory floor: memory_limit=65536 (64 MB), valid blink ──"
   run "CircuitRun low memory" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_LOW_MEMORY_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
