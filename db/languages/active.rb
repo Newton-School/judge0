@@ -279,12 +279,10 @@
   # Compiler-design lab: flex/bison/C programs built from several files.
   # source_code is a "bundle": each file starts with a marker line
   #   /* ==== FILE: name.ext ==== */
-  # (.l .y .c .h; at most one .l and one .y). The product shows the files as
-  # tabs and joins them; read-only instructor files arrive appended through
-  # post_function_code. A buffer with no marker is a single lex spec.
-  # Product contract: pre_function_code stays EMPTY (the build drops exactly
-  # one leading blank line so flex line numbers match the editor), and when
-  # a problem has read-only files every student tab starts with a marker.
+  # (.l .y .c .h; at most one .l and one .y). A buffer with no marker is a
+  # single lex spec. The build drops exactly one leading empty line (flex
+  # line numbers then count from the text after it); once any marker is
+  # present, every file must start with one.
   # stdin is the input fed to ./a.out. The compile step, newton-cdlab-build,
   # splits the bundle inside the sandbox (via the generic
   # newton-bundle-split), runs bison -y -d (%skeleton is refused), flex and

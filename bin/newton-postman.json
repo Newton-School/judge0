@@ -383,7 +383,7 @@
     },
     {
       "name": "Compiler-design lab (3010)",
-      "description": "C + Lex/Yacc lane 3010 (compiler-design lab). source_code is a bundle: each file starts with a marker line /* ==== FILE: name.ext ==== */ (.l .y .c .h; at most one .l and one .y), and a buffer with no marker is a single lex spec. stdin is the input fed to ./a.out. The product shows the files as tabs; read-only instructor files are appended through post_function_code (pre_function_code stays empty), and judge0 receives pre + \"\\n\" + src + \"\\n\" + post, which is why the marked bundles here start with a newline. Mirrors the 3010 cases in bin/newton-smoke-test.",
+      "description": "C + Lex/Yacc lane 3010 (compiler-design lab). source_code is a bundle: each file starts with a marker line /* ==== FILE: name.ext ==== */ (.l .y .c .h; at most one .l and one .y), and a buffer with no marker is a single lex spec. stdin is the input fed to ./a.out. The build drops exactly one leading empty line, which is why the marked bundles here start with a newline. Mirrors the 3010 cases in bin/newton-smoke-test.",
       "item": [
         {
           "name": "Lex only, no marker (3010)",
@@ -421,7 +421,7 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "description": "Sent with base64_encoded=true: source_code below is base64, and compile_output comes back base64 (wrapped every 60 characters; the test strips the line breaks before atob). bison and gcc run under LC_ALL=en_US.UTF-8 and quote with UTF-8 curly quotes, and judge0's plain-text mode cannot return any non-ASCII output: it answers HTTP 201 with only token + error (\"... cannot be converted to UTF-8\") and no status. The product always sends base64_encoded=true; do the same for any 3010 request that may fail to compile.\n\nDecoded source_code (bison rejects the stray \"::\" on line 3 of bad.y):\n\n/* ==== FILE: bad.y ==== */\n%token NUM\n%%\ns : NUM ::\n  ;\n%%",
+            "description": "Sent with base64_encoded=true: source_code below is base64, and compile_output comes back base64 (wrapped every 60 characters; the test strips the line breaks before atob). bison and gcc run under LC_ALL=en_US.UTF-8 and quote with UTF-8 curly quotes, and judge0's plain-text mode cannot return any non-ASCII output: it answers HTTP 201 with only token + error (\"... cannot be converted to UTF-8\") and no status. Always send base64_encoded=true for any 3010 request that may fail to compile.\n\nDecoded source_code (bison rejects the stray \"::\" on line 3 of bad.y):\n\n/* ==== FILE: bad.y ==== */\n%token NUM\n%%\ns : NUM ::\n  ;\n%%",
             "url": {"raw": "{{base_url}}/submissions?base64_encoded=true&wait=true&fields=stdout,stderr,status,message,compile_output", "host": ["{{base_url}}"], "path": ["submissions"], "query": [{"key": "base64_encoded", "value": "true"}, {"key": "wait", "value": "true"}, {"key": "fields", "value": "stdout,stderr,status,message,compile_output"}]},
             "body": {"mode": "raw", "raw": "{\n  \"language_id\": 3010,\n  \"source_code\": \"Ci8qID09PT0gRklMRTogYmFkLnkgPT09PSAqLwoldG9rZW4gTlVNCiUlCnMgOiBOVU0gOjoKICA7CiUl\"\n}"}
           }

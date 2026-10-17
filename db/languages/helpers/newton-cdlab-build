@@ -31,18 +31,15 @@
 #   Each file starts with a marker line  /* ==== FILE: name ==== */ .
 #   Allowed: .l .y .c .h; at most one .l and one .y; a pure .c/.h bundle is
 #   fine. Reserved: lex.yy.c y.tab.c y.tab.h y.output a.out main.bundle.
-#   The product composes source_code as pre + "\n" + editor + "\n" + post,
-#   with pre_function_code EMPTY for 3010 (read-only files go in post), so
-#   exactly one leading empty line is dropped first: "bundle line N" in
-#   messages, and main.l:N below, then mean editor line N.
+#   Exactly one leading empty line is dropped first (a bundle may start with
+#   one newline), so "bundle line N" in messages, and main.l:N below, count
+#   from the text after it.
 #   A buffer with no marker at all is ONE lex spec, compiled as main.l (a
-#   leading UTF-8 BOM is dropped). When a problem has read-only files, the
-#   product must start every student tab with a marker: the read-only files'
-#   markers make the buffer a bundle, and unmarked text in front of them is
-#   an error.
+#   leading UTF-8 BOM is dropped). Once any marker is present the buffer is a
+#   bundle, and unmarked text in front of the first marker is an error.
 #
-# BUILD (inside the build directory, so diagnostics name the files the way
-# the product's tabs do: yFile3.y:42, lFile3.l:7, cFile3.c:12)
+# BUILD (inside the build directory, so diagnostics name the files by their
+# marker names: yFile3.y:42, lFile3.l:7, cFile3.c:12)
 #   bison -y -d Y.y      -> y.tab.c y.tab.h  (what Debian's `yacc -d` runs)
 #   flex X.l             -> lex.yy.c
 #   gcc <judge0 id 50's lenient flags> <compiler_options>
@@ -76,7 +73,7 @@ trap 'rm -rf -- "$work"' EXIT
 src=$work/src
 mkdir "$src" || die "cannot create a build directory"
 
-# Drop the one empty line that composition puts in front of the editor text.
+# Drop one leading empty line (a bundle may start with one newline).
 # Shell text tools run byte-wise (LC_ALL=C); flex and gcc keep judge0's locale.
 LC_ALL=C sed '1{/^\r\{0,1\}$/d;}' "$box/main.bundle" > "$work/bundle" || die "cannot read main.bundle"
 

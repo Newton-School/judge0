@@ -2,9 +2,9 @@
 # newton-bundle-split - split a judge0 "bundle" source into separate files.
 #
 # Generic and language-agnostic: it knows nothing about any compiler. A lane
-# whose students edit several files (shown as tabs by the product) gets them
-# joined into one judge0 source_code buffer; the lane's compile step calls this
-# helper inside the isolate sandbox to get the files back. Its first user is
+# whose submissions consist of several files receives them joined into one
+# judge0 source_code buffer; the lane's compile step calls this helper inside
+# the isolate sandbox to get the files back. Its first user is
 # newton-cdlab-build (language 3010). Lives in judge0 at db/languages/helpers/;
 # NewtonDockerfile installs it to /usr/local/bin (isolate mounts /usr, not
 # /api) and newton-cdlab-selftest exercises it at image build.
@@ -40,8 +40,8 @@
 #     file. A trailing CR is dropped from every line (CRLF input) and every
 #     file is written newline-terminated, even when the buffer did not end
 #     with one.
-#   - Blank lines before the first marker are ignored (the product composes
-#     pre + "\n" + src + "\n" + post). Any other text there is an error.
+#   - Blank lines before the first marker are ignored. Any other text there
+#     is an error.
 #   - A line that looks like a marker ("/*", some '=', "FILE" in any case,
 #     then ":") but is not exactly a marker is an error, never content. This
 #     also catches a marker glued onto the previous file's last line, and a

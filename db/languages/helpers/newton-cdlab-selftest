@@ -16,9 +16,9 @@
 # All fixtures are inline and self-authored. Each lane case writes a
 # main.bundle into a fresh directory standing in for the isolate box, runs
 # the build there like judge0's compile step, then feeds ./a.out its stdin.
-# Bundles are composed the way the product composes source_code:
-# pre + "\n" + editor text + "\n" + post, with editor text that usually has
-# no trailing newline.
+# Most bundles are built with compose PRE TEXT POST, which joins the three
+# parts with newlines; PRE is empty, so each bundle starts with the one empty
+# line the build drops. TEXT usually has no trailing newline.
 
 set -u
 export LC_ALL=C
@@ -64,7 +64,7 @@ bad() {  # bad CASE REASON [DETAILS]
     if [ -n "${3-}" ]; then printf '%s\n' "$3" | sed 's/^/     | /'; fi
 }
 
-compose() { printf '%s\n%s\n%s' "$1" "$2" "$3"; }   # pre + "\n" + src + "\n" + post
+compose() { printf '%s\n%s\n%s' "$1" "$2" "$3"; }   # PRE \n TEXT \n POST
 crlf() { printf '%s' "$1" | sed 's/$/\r/'; }
 box_files() { find "$1" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' '; }
 
@@ -216,8 +216,8 @@ CALC_OWN_MAIN="$CALC_Y
 int yyerror(const char *s) { printf(\"error: %s\\n\", s); return 0; }
 int main(void) { printf(\"calc ready\\n\"); return yyparse(); }"
 
-# A lab whose student files (.l, .y) come first and whose read-only files
-# (.h, .c) arrive after them via post_function_code.
+# A lab whose student files (.l, .y) come first and whose fixed files
+# (.h, .c) come after them.
 STUDENT=$(cat <<'EOF'
 /* ==== FILE: expr.l ==== */
 %{
@@ -428,8 +428,8 @@ expect_fail headers_only "$(compose "" "/* ==== FILE: a.h ==== */
 int a;" "")" 'nothing to build'
 expect_fail empty_submission "$(compose "" "" "")" 'the submission is empty'
 
-# Exactly ONE leading empty line is dropped: an editor text that itself starts
-# with a blank line keeps it, so flex's line numbers still match the editor.
+# Exactly ONE leading empty line is dropped: a text that itself starts with a
+# blank line keeps it, so flex's line numbers still match that text.
 expect_fail markerless_editor_blank_first_line_kept "$(compose "" "
 $FLEXERR_L" "")" 'main.l:4: undefined definition'
 bom=$'\xef\xbb\xbf'
