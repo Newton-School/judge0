@@ -37,7 +37,10 @@ compilers image). Don't conflate them.
 │   ├── load-config                  # sources judge0.conf, sets RAILS env
 │   └── dev/{shell,bundle,clean,...} # dev helpers
 ├── bin/
-│   ├── newton-smoke-test            # 20-language end-to-end smoke test (post-trim)
+│   ├── newton-smoke-test            # end-to-end smoke, every active language id (36 checks on amd64)
+│   ├── newton-postman.json          # Postman mirror of newton-smoke-test (same sections + case names)
+│   ├── newton-bounds-test           # HELLO / TLE / OOM enforcement probes, sync + async
+│   ├── lint-active-rb               # active.rb + archived.rb lint (also runs at image build)
 │   └── agricius                     # release tarball generator (rare use)
 ├── db/
 │   ├── languages/active.rb          # canonical language id → command map
@@ -249,6 +252,13 @@ arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
 CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
 contributes three (hello-world, `man`, `whatis`).
 
+Two companions move with the smoke test when a language is added:
+`bin/newton-postman.json` mirrors its cases as importable Postman requests
+(folders follow the smoke sections, same case names), and
+`bin/newton-bounds-test` probes HELLO / TLE (`cpu_time_limit=1`) / OOM
+(64 MB cap, 200 MB alloc) per language in sync and async mode — 66 probes
+per mode with 3010 (24 HELLO + 23 TLE + 18 OOM + 1 CircuitRun low-memory).
+
 **Plain-text API mode cannot return non-ASCII output.** judge0 stores
 stdout/stderr/compile_output base64-encoded and decodes them as binary,
 so without `base64_encoded=true` any byte above 0x7F fails the response
@@ -256,7 +266,7 @@ so without `base64_encoded=true` any byte above 0x7F fails the response
 The compiler image runs with `LC_ALL=en_US.UTF-8`, so gcc/bison
 diagnostics quote with `‘…’` and every compile error trips this. The
 product always sends `base64_encoded=true`; smoke checks that read
-compile errors (`t_ce`) must too.
+compile errors (`t_ce`, and the Postman grammar-error request) must too.
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
@@ -333,7 +343,8 @@ in `judge0.conf` explain each. Summary:
   bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
   for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
   `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
-  28/0/0 on amd64.
+  was 28/0/0 at 0.76; it is 36/0/0 on amd64 with lane 3010 (see
+  "End-to-end smoke test").
 - **The compiler base is pinned by commit SHA, not semver.** The compilers
   workflow pushes `judge0-newton-compiler:<git-sha>` and `:latest` only; the
   `0.35`/`0.36` tags on Docker Hub were hand-pushed months ago, and the
@@ -350,12 +361,18 @@ in `judge0.conf` explain each. Summary:
   likewise push `newton-judge0:<git-sha>` and `:latest`, so the version
   numbers elsewhere in this file are a local-build convention rather than
   anything CI produces.
-- Production runs `newton-judge0:0.76` from ECR
-  (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0`) as of 2026-05-17.
-  Smoke green against `https://judge0-public.newtonschool.co`
-  (28/0/0 — three C# lanes on top of Phase 3). Deploys are **single-image** (no
-  docker-compose); the deployed `newton-judge0:<tag>` connects to managed
-  Postgres + managed Redis from the environment.
+- Production is two stacks (see "judge0.conf knobs"), each pinned to an
+  ECR image by git SHA (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:<sha>`,
+  set in kubernetes-cluster-infra `clusters/newton-core/base/code-compiler/deployment.yaml`).
+  As of 2026-10-17 the public stack (`judge0-public-api/-worker`) runs
+  `judge0:f4dd691cea8c…` (lane 3010 on compiler base f8f215e / label 0.39;
+  smoke 36/0/0 against `https://judge0-public.newtonschool.co`), and the
+  private stack (`judge0-api/-worker`, newton-api Submit) still runs
+  `judge0:82747e1ad547…` (no 3010) until 3010 is registered product-side.
+  Prod ECR images are pushed by hand from the build box; staging pulls
+  Docker Hub `newtonschool/newton-judge0:<sha>`. Deploys are
+  **single-image** (no docker-compose); the deployed image connects to
+  managed Postgres + managed Redis from the environment.
 - **AL2 → AL2023 NodeClass flip is done.** The karpenter `code-compiler`
   NodeClass moved to `amiFamily: AL2023` ahead of the 0.67 deploy, so
   `docker-entrypoint.sh`'s cgroup-v2 setup is active in prod and the
