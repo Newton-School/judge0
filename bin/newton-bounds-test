@@ -329,8 +329,8 @@ CIRCUITRUN_ARDUINO_STDIN='{
 }'
 
 # C + Lex/Yacc 3010 — source_code is a bundle of files, each starting with a
-# "/* ==== FILE: name ==== */" marker line; the product sends pre + "\n" +
-# editor + "\n" + post, so each bundle starts with a newline. TLE/OOM are
+# "/* ==== FILE: name ==== */" marker line; each bundle starts with the one
+# leading newline the build drops. TLE/OOM are
 # C_TLE/C_OOM above as a one-file .c bundle.
 CDLAB_HELLO='
 /* ==== FILE: hello.l ==== */

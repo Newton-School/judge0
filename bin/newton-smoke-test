@@ -161,7 +161,7 @@ _check_resp() {
 
 # t_ce <name> <language_id> <source_code> <compile_output_substring>
 # Expects status "Compilation Error" with the substring in compile_output.
-# Uses base64_encoded=true both ways, like the product: the compiler image
+# Uses base64_encoded=true both ways: the compiler image
 # runs with LC_ALL=en_US.UTF-8, so bison/gcc diagnostics carry UTF-8 quotes
 # (‘…’), and judge0 cannot render any non-ASCII output as plain JSON (it
 # returns "cannot be converted to UTF-8" with no status instead).
@@ -431,8 +431,7 @@ STDIN_CIRCUITRUN_ARDUINO='{
 
 # C + Lex/Yacc 3010 — source_code is a bundle of files, each starting with a
 # "/* ==== FILE: name ==== */" marker line; no marker = one lex spec. The
-# product sends pre + "\n" + editor + "\n" + post, so the bundles below start
-# with a newline and the read-only files of the multi-file case come last.
+# bundles below start with the one leading newline the build drops.
 SRC_CDLAB_LEX='%%
 [0-9]+                  printf("NUM(%s) ", yytext);
 [A-Za-z_][A-Za-z0-9_]*  printf("ID(%s) ", yytext);

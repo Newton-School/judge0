@@ -158,10 +158,8 @@ language ids exist and what they invoke. Editing it requires a
 - **C + Lex/Yacc id 3010 (compiler-design lab).** `source_code` is a
   *bundle*: every file starts with a marker line
   `/* ==== FILE: name.ext ==== */` (`.l .y .c .h`, at most one `.l` and
-  one `.y`; no marker = the whole buffer is one lex spec). The product
-  shows the files as tabs; read-only instructor files arrive appended via
-  `post_function_code` (composed `pre + "\n" + src + "\n" + post`).
-  `stdin` is the input fed to `./a.out`. `compile_cmd` is just
+  one `.y`; no marker = the whole buffer is one lex spec, compiled as
+  `main.l`). `stdin` is the input fed to `./a.out`. `compile_cmd` is just
   `/usr/local/bin/newton-cdlab-build %s`: it splits the bundle **inside
   the sandbox** with the generic `newton-bundle-split`, then runs
   `bison -y -d` → `flex` → GCC 9.5 with id 50's lenient flags (+
@@ -172,18 +170,13 @@ language ids exist and what they invoke. Editing it requires a
   the build fails on an older base by design. `compile_output` is a
   stage log: `==> bison -y -d yFile3.y` etc. appears only for a stage
   that printed something or failed, and diagnostics carry bare file names
-  (`yFile3.y:42`) matching the tabs. Rules for problem authors and the
-  product:
-  - `pre_function_code` must be **empty**; locked files go in
-    `post_function_code`. The build drops exactly one leading blank line
-    (the one composition adds) so marker-less flex errors say `main.l:N`
-    for editor line N; a non-empty pre shifts that, and a marked pre
-    silently swallows a marker-less student file.
-  - When a problem has locked files, every student tab must start with a
-    marker; a marker-less tab in front of marked locked files is a
-    Compilation Error ("text before the first file marker").
-  - `post_function_code` is sent to the browser, so locked files must never
-    contain solutions; check new locked files with `newton-bundle-split`.
+  (`yFile3.y:42`) matching the marker names. Contract rules:
+  - The build drops exactly **one** leading empty line, so a bundle may
+    start with one newline; marker-less flex errors then say `main.l:N`
+    for line N of the text after it. Other blank lines before the first
+    marker are ignored; any other text there is a Compilation Error
+    ("text before the first file marker"), so once any marker is present
+    every file must start with one.
   - A line that *looks* like a marker (`/*`, some `=`, `FILE` in any case,
     `:`; also with a no-break space or fullwidth `=`/`:`) but is not exact
     is a hard error, never content — so a banner comment like
@@ -264,9 +257,9 @@ stdout/stderr/compile_output base64-encoded and decodes them as binary,
 so without `base64_encoded=true` any byte above 0x7F fails the response
 ("cannot be converted to UTF-8", HTTP 201 with only `token` + `error`).
 The compiler image runs with `LC_ALL=en_US.UTF-8`, so gcc/bison
-diagnostics quote with `‘…’` and every compile error trips this. The
-product always sends `base64_encoded=true`; smoke checks that read
-compile errors (`t_ce`, and the Postman grammar-error request) must too.
+diagnostics quote with `‘…’` and every compile error trips this. Always
+send `base64_encoded=true`; smoke checks that read compile errors
+(`t_ce`, and the Postman grammar-error request) do.
 
 Rspec tests in `spec/` are mostly upstream — Newton has not added
 comprehensive specs. Don't rely on `bundle exec rspec` for end-to-end
@@ -276,8 +269,9 @@ validation; use `bin/newton-smoke-test`.
 
 `judge0.conf` is the dev/local config only — `.dockerignore` keeps it out
 of the image. Production runs two separate stacks configured from k8s
-secrets: `judge0-config` (judge0-api/-worker, newton-api Submit) and
-`judge0-public-config` (judge0-public-api/-worker, the SPA's Run), each
+secrets: `judge0-config` (judge0-api/-worker, private, cluster-internal)
+and `judge0-public-config` (judge0-public-api/-worker, public,
+`https://judge0-public.newtonschool.co`), each
 with its own Postgres that re-seeds `languages` on boot. A new language
 must reach both stacks, and smoke tests should hit both endpoints.
 
@@ -364,11 +358,10 @@ in `judge0.conf` explain each. Summary:
 - Production is two stacks (see "judge0.conf knobs"), each pinned to an
   ECR image by git SHA (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:<sha>`,
   set in kubernetes-cluster-infra `clusters/newton-core/base/code-compiler/deployment.yaml`).
-  As of 2026-10-17 the public stack (`judge0-public-api/-worker`) runs
-  `judge0:f4dd691cea8c…` (lane 3010 on compiler base f8f215e / label 0.39;
-  smoke 36/0/0 against `https://judge0-public.newtonschool.co`), and the
-  private stack (`judge0-api/-worker`, newton-api Submit) still runs
-  `judge0:82747e1ad547…` (no 3010) until 3010 is registered product-side.
+  As of 2026-10-17 both stacks (`judge0-public-api/-worker` and
+  `judge0-api/-worker`) run `judge0:f4dd691cea8c…` (lane 3010 on compiler
+  base f8f215e / label 0.39; smoke 36/0/0 against
+  `https://judge0-public.newtonschool.co`), and staging runs the same SHA.
   Prod ECR images are pushed by hand from the build box; staging pulls
   Docker Hub `newtonschool/newton-judge0:<sha>`. Deploys are
   **single-image** (no docker-compose); the deployed image connects to
