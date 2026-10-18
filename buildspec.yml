@@ -1,0 +1,38 @@
+version: 0.2
+
+# AWS CodeBuild project "judge0" (prod account 405612465938, ap-south-1).
+# Its GitHub webhook starts a build on every push to master. The build pushes
+# NewtonDockerfile's production target to ECR as judge0:<commit-sha>, the tag
+# kubernetes-cluster-infra pins, and moves judge0:latest. A manual build of a
+# branch (start-build --source-version <branch>) pushes its SHA tag only.
+#
+# The project supplies AWS_ACCOUNT_ID, AWS_DEFAULT_REGION and IMAGE_REPO_NAME.
+# The layer cache, judge0:buildcache, is shared with the "Trigger Production
+# Build" GitHub workflow (.github/workflows/build-prod.yml).
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - IMAGE="$REGISTRY/$IMAGE_REPO_NAME"
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+      # Exporting the cache to a registry needs the docker-container driver.
+      - docker buildx create --name judge0 --driver docker-container --use
+      - LATEST_TAG=""
+      - if [ "${CODEBUILD_WEBHOOK_HEAD_REF:-}" = refs/heads/master ]; then LATEST_TAG="--tag $IMAGE:latest"; fi
+  build:
+    commands:
+      # --provenance=false pushes one manifest per build instead of an index
+      # plus attestations, so builds use fewer of the repo's lifecycle slots.
+      - >-
+        docker buildx build
+        --file NewtonDockerfile --target production --platform linux/amd64
+        --provenance=false
+        --cache-from "type=registry,ref=$IMAGE:buildcache"
+        --cache-to "type=registry,ref=$IMAGE:buildcache,mode=max"
+        --tag "$IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION" $LATEST_TAG
+        --push .
+      - echo "Pushed $IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION"
