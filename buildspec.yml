@@ -19,15 +19,21 @@ phases:
       - REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
       - IMAGE="$REGISTRY/$IMAGE_REPO_NAME"
       - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+      # Never rebuild a SHA that is already in ECR: tags in this repo are
+      # mutable, and a rebuild (apt, gems) is not byte-identical to the image a
+      # deployment may already pin. A retried build is then a no-op.
+      - EXISTS=""
+      - if docker buildx imagetools inspect "$IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION" >/dev/null 2>&1; then EXISTS=1; echo "$IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION already exists; not rebuilding"; fi
       # Exporting the cache to a registry needs the docker-container driver.
       - docker buildx create --name judge0 --driver docker-container --use
       - LATEST_TAG=""
-      - if [ "${CODEBUILD_WEBHOOK_HEAD_REF:-}" = refs/heads/master ]; then LATEST_TAG="--tag $IMAGE:latest"; fi
+      - if [ "${CODEBUILD_WEBHOOK_TRIGGER:-}" = branch/master ]; then LATEST_TAG="--tag $IMAGE:latest"; fi
   build:
     commands:
-      # --provenance=false pushes one manifest per build instead of an index
-      # plus attestations, so builds use fewer of the repo's lifecycle slots.
+      # --provenance=false pushes one manifest instead of an index plus
+      # attestation manifests.
       - >-
+        test -n "$EXISTS" ||
         docker buildx build
         --file NewtonDockerfile --target production --platform linux/amd64
         --provenance=false
@@ -35,4 +41,4 @@ phases:
         --cache-to "type=registry,ref=$IMAGE:buildcache,mode=max"
         --tag "$IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION" $LATEST_TAG
         --push .
-      - echo "Pushed $IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - test -n "$EXISTS" || echo "Pushed $IMAGE:$CODEBUILD_RESOLVED_SOURCE_VERSION"
