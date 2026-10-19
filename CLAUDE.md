@@ -362,8 +362,14 @@ in `judge0.conf` explain each. Summary:
   `judge0-api/-worker`) run `judge0:f4dd691cea8c…` (lane 3010 on compiler
   base f8f215e / label 0.39; smoke 36/0/0 against
   `https://judge0-public.newtonschool.co`), and staging runs the same SHA.
-  Prod ECR images are pushed by hand from the build box; staging pulls
-  Docker Hub `newtonschool/newton-judge0:<sha>`. Deploys are
+  Prod ECR images are built by the AWS CodeBuild project `judge0` (prod
+  account, `buildspec.yml`): its webhook builds every push to master and
+  pushes `judge0:<sha>` plus `:latest`; a SHA already in ECR is never
+  rebuilt. The manual "Trigger Production Build" workflow pushes the same
+  tags and shares the `judge0:buildcache` layer cache. The ECR repo's
+  lifecycle policy keeps the newest 50 tagged images and expires untagged
+  entries after 7 days, so a deployed SHA survives about 50 later merges.
+  Staging pulls Docker Hub `newtonschool/newton-judge0:<sha>`. Deploys are
   **single-image** (no docker-compose); the deployed image connects to
   managed Postgres + managed Redis from the environment.
 - **AL2 → AL2023 NodeClass flip is done.** The karpenter `code-compiler`
