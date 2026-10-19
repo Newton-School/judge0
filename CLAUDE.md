@@ -351,10 +351,11 @@ in `judge0.conf` explain each. Summary:
   and `:0.39` (same digest, `sha256:e7ffeab5…`), not by the compilers
   workflow. It sits on #22, which caps CircuitRun's arduino-cli at
   `--jobs 4` / `GOMAXPROCS=4` so Arduino builds fit isolate's
-  RLIMIT_NPROC, and #21, which added man-db for the Bash lane. Both workflows here
-  likewise push `newton-judge0:<git-sha>` and `:latest`, so the version
-  numbers elsewhere in this file are a local-build convention rather than
-  anything CI produces.
+  RLIMIT_NPROC, and #21, which added man-db for the Bash lane. CI here
+  likewise tags by SHA (CodeBuild pushes ECR `judge0:<git-sha>`, the staging
+  workflow Docker Hub `newton-judge0:<git-sha>`, each plus `:latest`), so the
+  version numbers elsewhere in this file are a local-build convention rather
+  than anything CI produces.
 - Production is two stacks (see "judge0.conf knobs"), each pinned to an
   ECR image by git SHA (`405612465938.dkr.ecr.ap-south-1.amazonaws.com/judge0:<sha>`,
   set in kubernetes-cluster-infra `clusters/newton-core/base/code-compiler/deployment.yaml`).
@@ -365,8 +366,9 @@ in `judge0.conf` explain each. Summary:
   Prod ECR images are built by the AWS CodeBuild project `judge0` (prod
   account, `buildspec.yml`): its webhook builds every push to master and
   pushes `judge0:<sha>` plus `:latest`; a SHA already in ECR is never
-  rebuilt. The manual "Trigger Production Build" workflow pushes the same
-  tags and shares the `judge0:buildcache` layer cache. The ECR repo's
+  rebuilt; its layer cache is `judge0:buildcache`. CodeBuild is the only
+  writer: the old "Trigger Production Build" GitHub workflow was retired
+  because it lacked that guard. The ECR repo's
   lifecycle policy keeps the newest 50 tagged images and expires untagged
   entries after 7 days, so a deployed SHA survives about 50 later merges.
   Staging pulls Docker Hub `newtonschool/newton-judge0:<sha>`. Deploys are
