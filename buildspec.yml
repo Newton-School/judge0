@@ -7,8 +7,7 @@ version: 0.2
 # branch (start-build --source-version <branch>) pushes its SHA tag only.
 #
 # The project supplies AWS_ACCOUNT_ID, AWS_DEFAULT_REGION and IMAGE_REPO_NAME.
-# The layer cache, judge0:buildcache, is shared with the "Trigger Production
-# Build" GitHub workflow (.github/workflows/build-prod.yml).
+# The layer cache is judge0:buildcache in the same ECR repo.
 
 env:
   shell: bash
