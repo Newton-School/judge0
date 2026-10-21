@@ -26,6 +26,7 @@ USER root
 # succeeds and the fallback is never taken. On affected builds, we fall
 # back to legacy [trusted=yes] sources so the build can complete.
 # (TLS still authenticates the upstream mirror.)
+# ca-certificates is upgraded because Ruby verifies TLS against it (SSL_CERT_FILE below).
 RUN set -eux; \
     if ! apt-get update; then \
         echo ">> apt-get update failed; falling back to [trusted=yes] sources"; \
@@ -36,6 +37,7 @@ RUN set -eux; \
         fi; \
         apt-get update; \
     fi; \
+    apt-get install -y --only-upgrade ca-certificates; \
     apt-get install -y --no-install-recommends \
       cron \
       libpq-dev \
