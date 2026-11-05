@@ -10,7 +10,7 @@
 #   - hello world (default limits)         → expect Accepted
 #   - busy loop (cpu_time_limit=1)         → expect Time Limit Exceeded
 #   - 200 MB alloc (memory_limit=65536 KB) → expect Runtime Error (cgroup-v2 OOM kill)
-#   - CircuitRun under 64 MB               → expect runtime/memory failure; this is a
+#   - 3009 CircuitRun under 64 MB          → expect runtime/memory failure; this is a
 #                                             low-memory floor probe, not emulated MCU OOM
 #
 # Coverage: every active language that has natural busy-loop / alloc semantics.
@@ -413,11 +413,11 @@ $C_OOM"
 # ── plan ──
 TLE_OPTS='{"cpu_time_limit":1,"wall_time_limit":5}'
 OOM_OPTS='{"memory_limit":65536}'   # 64 MB cap; programs alloc 200 MB
-CIRCUITRUN_LOW_MEMORY_OPTS='{"memory_limit":65536}'   # 64 MB cap; valid CircuitRun should not fit
+CIRCUITRUN_LOW_MEMORY_OPTS='{"memory_limit":65536}'   # 64 MB cap; a valid 3009 run should not fit
 
 echo "Target: $URL"
 echo "Bounds: cpu_time_limit=1 (TLE probe), memory_limit=65536KB / alloc 200MB (OOM probe)"
-echo "CircuitRun: memory_limit=65536KB is a low-memory floor probe, not student-code OOM"
+echo "CircuitRun 3009: memory_limit=65536KB is a low-memory floor probe, not student-code OOM"
 echo
 
 for mode in sync async; do
@@ -498,6 +498,7 @@ for mode in sync async; do
 
   echo "── CircuitRun low-memory floor: memory_limit=65536 (64 MB), valid blink ──"
   run "CircuitRun low memory" "$mode" 'Runtime Error|Memory Limit|Killed' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_LOW_MEMORY_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
+
   echo
 done
 

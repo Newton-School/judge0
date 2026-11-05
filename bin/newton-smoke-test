@@ -442,7 +442,7 @@ void loop() {
   delay(100);
 }'
 
-# The compilers image's bin/newton-test sends the same payload; keep the two in step.
+# compilers' bin/newton-test sends this payload, question_id aside; keep the two in step.
 STDIN_CIRCUITRUN_ESP32_S3='{
   "schema_version": "2026-05-01",
   "mode": "evaluate",

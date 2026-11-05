@@ -1,5 +1,5 @@
 # Compiler base is pinned to the commit SHA the compilers CI actually pushes;
-# the 0.3x numbers in that repo are a doc convention, not published tags.
+# the 0.x numbers in that repo are a doc convention, not published tags.
 # c51f91f = Newton-School/compilers#26 (label 0.40): CircuitRun ESP32-S3 for
 # lane 3011, on top of #23's Tier 15 flex/bison for lane 3010. Pushed by the
 # compilers workflow as :<sha> and :latest (digest sha256:526537d7…).

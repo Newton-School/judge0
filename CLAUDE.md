@@ -37,7 +37,7 @@ compilers image). Don't conflate them.
 │   ├── load-config                  # sources judge0.conf, sets RAILS env
 │   └── dev/{shell,bundle,clean,...} # dev helpers
 ├── bin/
-│   ├── newton-smoke-test            # end-to-end smoke, every active language id (36 checks on amd64)
+│   ├── newton-smoke-test            # end-to-end smoke, every active language id (39 checks on amd64)
 │   ├── newton-postman.json          # Postman mirror of newton-smoke-test (same sections + case names)
 │   ├── newton-bounds-test           # HELLO / TLE / OOM enforcement probes, sync + async
 │   ├── lint-active-rb               # active.rb + archived.rb lint (also runs at image build)
@@ -191,12 +191,19 @@ language ids exist and what they invoke. Editing it requires a
   `bin/lint-active-rb` checks it (it runs at image build; CI has no PR
   job, so run it locally before merging).
 
-- **CircuitRun ESP32-S3 DevKitC-1 id 3011.** Same stdin payload and assets
-  as 3009, but `compile_cmd` builds the firmware (`build/firmware.bin`, a
-  4 MiB flash image) under judge0's `MAX_*` limits with no stdin, and
-  `run_cmd` boots it in the dist's patched QEMU and grades it. A sketch
-  error is a Compilation Error with gcc's `main.ino:<line>:` text. Needs a
+- **CircuitRun ESP32-S3 DevKitC-1 id 3011.** Same stdin payload and asset
+  names as 3009, each asset with a 1 MiB `max_size`. `compile_cmd` builds
+  the firmware (`build/firmware.bin`, a 4 MiB flash image) under judge0's
+  `MAX_*` limits with no stdin, and `run_cmd` boots it in the CircuitRun
+  dist's patched QEMU (`qemu-system-xtensa`) and grades it. A sketch error
+  is a Compilation Error with gcc's `main.ino:<line>:` text. Needs a
   compilers image whose Tier 13 pins the Uno + ESP32-S3 dist (label 0.40+).
+  The compile needs `MAX_MAX_FILE_SIZE` of at least 8192 KB (blink fails
+  at 4096 KB). Under `MAX_MEMORY_LIMIT` (500 MiB in prod) blink, a
+  `<bits/stdc++.h>` sketch with a few containers and a `std::regex` sketch
+  compile; one combining `<bits/stdc++.h>`, `std::regex`, `std::wregex` and
+  about ten containers goes over and fails as a Compilation Error (`Killed
+  signal terminated program cc1plus`). Measured on arm64.
 
 ## Build commands
 
@@ -258,7 +265,7 @@ Two companions move with the smoke test when a language is added:
 (folders follow the smoke sections, same case names), and
 `bin/newton-bounds-test` probes HELLO / TLE (`cpu_time_limit=1`) / OOM
 (64 MB cap, 200 MB alloc) per language in sync and async mode — 68 probes
-per mode with 3011 (25 HELLO + 24 TLE + 18 OOM + 1 CircuitRun low-memory).
+per mode with 3011 (25 HELLO + 24 TLE + 18 OOM + 1 CircuitRun 3009 low-memory).
 
 **Plain-text API mode cannot return non-ASCII output.** judge0 stores
 stdout/stderr/compile_output base64-encoded and decodes them as binary,
@@ -345,12 +352,12 @@ in `judge0.conf` explain each. Summary:
   bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
   for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
   `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
-  was 28/0/0 at 0.76; it is 36/0/0 on amd64 with lane 3010 (see
+  was 28/0/0 at 0.76; it is 39/0/0 on amd64 with lanes 3010 and 3011 (see
   "End-to-end smoke test").
 - **The compiler base is pinned by commit SHA, not semver.** The compilers
   workflow pushes `judge0-newton-compiler:<git-sha>` and `:latest` only; the
   `0.35`/`0.36` tags on Docker Hub were hand-pushed months ago, and the
-  `0.3x` numbering now lives solely in that repo's
+  `0.x` numbering lives solely in that repo's
   `org.opencontainers.image.version` label — a semver tag for a new build
   will not exist. `NewtonDockerfile` pins
   `c51f91f531a575827231b61f0148a7a5d36d451a` (Newton-School/compilers#26,

@@ -300,7 +300,7 @@
     compile_cmd: "/usr/local/bin/newton-cdlab-build %s",
     run_cmd: "./a.out"
   },
-  # The firmware doesn't depend on the test case, so the compile step (no stdin) builds it
+  # The firmware doesn't depend on the testcase, so the compile step builds it
   {
     id: 3011,
     name: "CircuitRun ESP32-S3 DevKitC-1 Arduino C++",
