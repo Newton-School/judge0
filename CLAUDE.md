@@ -191,6 +191,13 @@ language ids exist and what they invoke. Editing it requires a
   `bin/lint-active-rb` checks it (it runs at image build; CI has no PR
   job, so run it locally before merging).
 
+- **CircuitRun ESP32-S3 DevKitC-1 id 3011.** Same stdin payload and assets
+  as 3009, but `compile_cmd` builds the firmware (`build/firmware.bin`, a
+  4 MiB flash image) under judge0's `MAX_*` limits with no stdin, and
+  `run_cmd` boots it in the dist's patched QEMU and grades it. A sketch
+  error is a Compilation Error with gcc's `main.ino:<line>:` text. Needs a
+  compilers image whose Tier 13 pins the Uno + ESP32-S3 dist (label 0.40+).
+
 ## Build commands
 
 ```bash
@@ -239,8 +246,9 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world or equivalent behavioral smoke for every active language
-id. Expected after `man` support on top of 0.76, plus the four 3010 cases:
-**36 PASS / 0 FAIL / 0 SKIP** on amd64; **34 PASS / 0 FAIL / 2 SKIP** on
+id. Expected after `man` support on top of 0.76, plus the four 3010 cases
+and 3011's three (accepted, its result asset, a compile error):
+**39 PASS / 0 FAIL / 0 SKIP** on amd64; **37 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
 CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
 contributes three (hello-world, `man`, `whatis`).
@@ -249,8 +257,8 @@ Two companions move with the smoke test when a language is added:
 `bin/newton-postman.json` mirrors its cases as importable Postman requests
 (folders follow the smoke sections, same case names), and
 `bin/newton-bounds-test` probes HELLO / TLE (`cpu_time_limit=1`) / OOM
-(64 MB cap, 200 MB alloc) per language in sync and async mode — 66 probes
-per mode with 3010 (24 HELLO + 23 TLE + 18 OOM + 1 CircuitRun low-memory).
+(64 MB cap, 200 MB alloc) per language in sync and async mode — 68 probes
+per mode with 3011 (25 HELLO + 24 TLE + 18 OOM + 1 CircuitRun low-memory).
 
 **Plain-text API mode cannot return non-ASCII output.** judge0 stores
 stdout/stderr/compile_output base64-encoded and decodes them as binary,
