@@ -199,11 +199,12 @@ language ids exist and what they invoke. Editing it requires a
   is a Compilation Error with gcc's `main.ino:<line>:` text. Needs a
   compilers image whose Tier 13 pins the Uno + ESP32-S3 dist (label 0.40+).
   The compile needs `MAX_MAX_FILE_SIZE` of at least 8192 KB (blink fails
-  at 4096 KB). Under `MAX_MEMORY_LIMIT` (500 MiB in prod) blink, a
-  `<bits/stdc++.h>` sketch with a few containers and a `std::regex` sketch
-  compile; one combining `<bits/stdc++.h>`, `std::regex`, `std::wregex` and
-  about ten containers goes over and fails as a Compilation Error (`Killed
-  signal terminated program cc1plus`). Measured on arm64.
+  at 4096 KB). Under `MAX_MEMORY_LIMIT` (512000 KB on the public prod
+  stack) blink, a `<bits/stdc++.h>` sketch with a few containers and a
+  `std::regex` sketch compile; one combining `<bits/stdc++.h>`,
+  `std::regex`, `std::wregex` and about ten containers goes over and fails
+  as a Compilation Error (`Killed signal terminated program cc1plus`).
+  Measured on arm64.
 
 ## Build commands
 
