@@ -192,7 +192,8 @@ language ids exist and what they invoke. Editing it requires a
   job, so run it locally before merging).
 
 - **CircuitRun ESP32-S3 DevKitC-1 id 3011.** Same stdin payload and asset
-  names as 3009, each asset with a 1 MiB `max_size`. `compile_cmd` builds
+  names as 3009, each asset with a 1 MiB `max_size` (production's
+  `MAX_MAX_ASSET_SIZE` of 40960 bytes caps it). `compile_cmd` builds
   the firmware (`build/firmware.bin`, a 4 MiB flash image) under judge0's
   `MAX_*` limits with no stdin, and `run_cmd` boots it in the CircuitRun
   dist's patched QEMU (`qemu-system-xtensa`) and grades it. A sketch error
@@ -304,7 +305,7 @@ in `judge0.conf` explain each. Summary:
 | `MAX_MAX_PROCESSES_AND_OR_THREADS` | 120 | **4096** | compile-time max |
 | `MAX_FILE_SIZE` | 1 MB | **1 GiB** | Go 1.23 binaries + Java class+jar bundles can exceed 1 MB |
 | `MAX_MAX_FILE_SIZE` | 4 MB | **2 GiB** | per-submission max |
-| `MAX_MAX_ASSET_SIZE` | – (new in 0.67) | **1048576** (1 MiB) | Phase 3 asset cap; clamps any per-language `max_size`; keeps first-pass CircuitRun artifact capture bounded |
+| `MAX_MAX_ASSET_SIZE` | – (new in 0.67) | **20480** (20 KB) | Phase 3 asset cap; clamps any per-language `max_size` |
 
 ## Common pitfalls
 
