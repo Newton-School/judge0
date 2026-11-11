@@ -85,15 +85,16 @@ t_stdin() {
     _check_resp "$name" "$lid" "$expected" "$resp"
 }
 
-# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name> [<memory_limit_kb>]
+# t_stdin_with_asset <name> <language_id> <source_code> <stdin> <expected_substring> <asset_logical_name> [<memory_limit_kb>] [<status>]
 # Phase 3 — same as t_stdin, but also asserts the named asset is captured:
 #   1. submission GET (with fields=...,assets) returns metadata with size_bytes>0 and error=null
 #   2. dedicated bytes endpoint returns HTTP 200
 # Adds an additional PASS/FAIL row beyond the stdout grading check, so a
 # Verilog problem with $dumpfile contributes 2 entries to the smoke summary.
+# A <status> other than Accepted is matched with <expected_substring> in stderr.
 t_stdin_with_asset() {
     local name="$1" lid="$2" src="$3" stdin="$4" expected="$5" asset_name="$6"
-    local mem="${7:-}"
+    local mem="${7:-}" want="${8:-Accepted}"
     local payload resp token assets_json size err bytes_status
 
     if [[ -n "$mem" ]]; then
@@ -107,7 +108,7 @@ t_stdin_with_asset() {
         -H 'Content-Type: application/json' -d "$payload")"
 
     token="$(echo "$resp" | jq -r '.token // empty')"
-    _check_resp "$name" "$lid" "$expected" "$resp"
+    _check_resp "$name" "$lid" "$expected" "$resp" "$want"
 
     if [[ -z "$token" ]]; then
         printf "  \033[31mFAIL\033[0m  %s asset (no token returned)\n" "$name"
@@ -140,17 +141,18 @@ t_stdin_with_asset() {
 }
 
 _check_resp() {
-    local name="$1" lid="$2" expected="$3" resp="$4"
-    local status stdout err
+    local name="$1" lid="$2" expected="$3" resp="$4" want="${5:-Accepted}"
+    local status stdout err field=stdout
+    [[ "$want" == "Accepted" ]] || field=stderr
     status="$(echo "$resp" | jq -r '.status.description // "?"')"
-    stdout="$(echo "$resp" | jq -r '.stdout // ""')"
-    if [[ "$status" == "Accepted" && "$stdout" == *"$expected"* ]]; then
+    stdout="$(echo "$resp" | jq -r --arg f "$field" '.[$f] // ""')"
+    if [[ "$status" == "$want" && "$stdout" == *"$expected"* ]]; then
         printf "  \033[32mPASS\033[0m  %s\n" "$name"
         PASS=$((PASS+1))
     else
         printf "  \033[31mFAIL\033[0m  %s  status=%s\n" "$name" "$status"
         if [[ -n "$stdout" ]]; then
-            printf "        stdout: %s\n" "$(echo "$stdout" | head -1)"
+            printf "        %s: %s\n" "$field" "$(echo "$stdout" | head -1)"
         fi
         err="$(echo "$resp" | jq -r '.compile_output // .stderr // .message // empty' | head -3 | tr '\n' ' ')"
         [[ -n "$err" ]] && printf "        err: %s\n" "$err"
@@ -487,6 +489,180 @@ SRC_CIRCUITRUN_ESP32_S3_BAD='void setup() {
 
 void loop() {}'
 
+# From circuitrun's docker/dist/cases: wifi-join, ble-advertise, radio-unsupported-wifi/softap.ino.
+SRC_CIRCUITRUN_ESP32_S3_WIFI='#include <WiFi.h>
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin("lab-ap", "secret123");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+  }
+  Serial.print("IP ");
+  Serial.println(WiFi.localIP());
+}
+
+void loop() {
+  delay(1000);
+}'
+
+STDIN_CIRCUITRUN_ESP32_S3_WIFI='{
+  "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [
+      {
+        "id": "ap",
+        "model": "wifi-ap",
+        "attrs": {
+          "ssid": "lab-ap",
+          "password": "secret123"
+        }
+      }
+    ],
+    "nets": []
+  },
+  "scenario": {
+    "duration_ms": 4000,
+    "stimuli": []
+  },
+  "checks": [
+    {
+      "type": "wifi-connected",
+      "id": "joined",
+      "ssid": "lab-ap",
+      "ip": "192.168.4.100",
+      "before_ms": 3000
+    },
+    {
+      "type": "serial-contains",
+      "id": "prints-the-lease",
+      "port": "Serial",
+      "text": "IP 192.168.4.100"
+    }
+  ],
+  "artifacts": {
+    "enabled": ["result.json", "waveform.json", "serial.log", "network.json"]
+  },
+  "limits": {
+    "max_wall_ms": 20000
+  },
+  "context": {
+    "question_id": "judge0-smoke",
+    "test_case_id": "esp32-s3-wifi"
+  }
+}'
+
+SRC_CIRCUITRUN_ESP32_S3_BLE='#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+
+#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Starting BLE");
+  BLEDevice::init("CircuitRun-B1");
+  BLEServer *pServer = BLEDevice::createServer();
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  pService->start();
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  BLEDevice::startAdvertising();
+  Serial.println("Advertising started");
+}
+
+void loop() {
+  delay(2000);
+}'
+
+STDIN_CIRCUITRUN_ESP32_S3_BLE='{
+  "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [],
+    "nets": []
+  },
+  "scenario": {
+    "duration_ms": 1000,
+    "stimuli": []
+  },
+  "checks": [
+    {
+      "type": "serial-contains",
+      "id": "init-returns",
+      "port": "Serial",
+      "text": "Advertising started"
+    },
+    {
+      "type": "ble-advertised",
+      "id": "name-and-service",
+      "name": "CircuitRun-B1",
+      "service_uuid": "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+    }
+  ],
+  "artifacts": {
+    "enabled": ["result.json", "waveform.json", "serial.log", "network.json"]
+  },
+  "limits": {
+    "max_wall_ms": 20000
+  },
+  "context": {
+    "question_id": "judge0-smoke",
+    "test_case_id": "esp32-s3-ble"
+  }
+}'
+
+SRC_CIRCUITRUN_ESP32_S3_SOFTAP='#include <WiFi.h>
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(2, OUTPUT);
+  Serial.println("starting the access point");
+  Serial.flush();
+  WiFi.softAP("lab-board", "password123");
+  Serial.println("the run went on");
+  digitalWrite(2, HIGH);
+}
+
+void loop() {}'
+
+STDIN_CIRCUITRUN_ESP32_S3_SOFTAP='{
+  "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [],
+    "nets": []
+  },
+  "scenario": {
+    "duration_ms": 1000,
+    "stimuli": []
+  },
+  "checks": [
+    {
+      "type": "pin-state",
+      "id": "runs-on",
+      "pin": "GPIO2",
+      "level": "high",
+      "after_ms": 500
+    }
+  ],
+  "artifacts": {
+    "enabled": ["result.json", "waveform.json", "serial.log", "network.json"]
+  },
+  "limits": {
+    "max_wall_ms": 20000
+  },
+  "context": {
+    "question_id": "judge0-smoke",
+    "test_case_id": "esp32-s3-softap"
+  }
+}'
+
 # C + Lex/Yacc 3010 — source_code is a bundle of files, each starting with a
 # "/* ==== FILE: name ==== */" marker line; no marker = one lex spec. The
 # bundles below start with the one leading newline the build drops.
@@ -663,6 +839,16 @@ t_stdin_with_asset "CircuitRun ESP32-S3 DevKitC-1 Arduino C++ (3011)" 3011 \
     "$SRC_CIRCUITRUN_ESP32_S3" "$STDIN_CIRCUITRUN_ESP32_S3" \
     "CIRCUITRUN_EVALUATE_ACCEPTED" "result.json" 256000
 t_ce "Sketch error -> Compilation Error (3011)" 3011 "$SRC_CIRCUITRUN_ESP32_S3_BAD" "main.ino:2:"
+t_stdin_with_asset "CircuitRun ESP32-S3 Wi-Fi join (3011)" 3011 \
+    "$SRC_CIRCUITRUN_ESP32_S3_WIFI" "$STDIN_CIRCUITRUN_ESP32_S3_WIFI" \
+    "CIRCUITRUN_EVALUATE_ACCEPTED" "network.json" 256000
+t_stdin_with_asset "CircuitRun ESP32-S3 BLE advertising (3011)" 3011 \
+    "$SRC_CIRCUITRUN_ESP32_S3_BLE" "$STDIN_CIRCUITRUN_ESP32_S3_BLE" \
+    "CIRCUITRUN_EVALUATE_ACCEPTED" "network.json" 256000
+# newton-web reads result.json for an unsupported run's message.
+t_stdin_with_asset "Soft-AP -> Runtime Error, unsupported (3011)" 3011 \
+    "$SRC_CIRCUITRUN_ESP32_S3_SOFTAP" "$STDIN_CIRCUITRUN_ESP32_S3_SOFTAP" \
+    "the sketch called WiFi.softAP()" "result.json" 256000 "Runtime Error (NZEC)"
 
 # ────────────────────────────────────────────────────────────────────────
 section "Compiler-design lab (3010)"

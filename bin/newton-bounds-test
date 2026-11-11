@@ -27,6 +27,11 @@
 #                       under judge0's MAX_* limits, so its TLE probe polls millis() for
 #                       a 10 s scenario (about 8 s of CPU) instead of reusing the blink.
 #                       No low-memory probe: the run step alone passes under a 64 MB cgroup.
+#                       Its radio HELLO links Wi-Fi, HTTPClient, WebServer and BLE three
+#                       times (anon peak about 244 MB on arm64), so it tests a compile memory
+#                       limit of 512000 KB only on a stack set to that. Its radio TLE probe
+#                       polls an MQTT client with no delay while the simulated network runs,
+#                       with the 256000 KB memory_limit newton-api sends at least.
 #   - 3010 C + Lex/Yacc — HELLO is a marked lex spec (bundle split + flex + libfl's
 #                         main); TLE/OOM are C_TLE/C_OOM as one-file .c bundles, so
 #                         they bound the built a.out like id 50, not bison/flex/gcc
@@ -393,6 +398,234 @@ CIRCUITRUN_ESP32_S3_STDIN='{
 }'
 CIRCUITRUN_ESP32_S3_POLL_STDIN="${CIRCUITRUN_ESP32_S3_STDIN/\"duration_ms\": 1000/\"duration_ms\": 10000}"
 
+# circuitrun's cases/radio-size/program-plain.ino: its keep link is over the program limit.
+CIRCUITRUN_ESP32_S3_RADIO_BUILD='#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WebServer.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+
+WebServer server(80);
+static const uint8_t PROGRAM_BYTES[45954] = {1};
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(2, OUTPUT);
+  Serial.println(PROGRAM_BYTES[millis() % 45954]);
+  if (millis() > 3600000) {
+    WiFi.begin("lab-ap", "secret123");
+    HTTPClient http;
+    http.begin("http://example.test/data");
+    Serial.println(http.GET());
+    server.on("/", []() { server.send(200, "text/plain", "ok"); });
+    server.begin();
+    BLEDevice::init("CircuitRun");
+    BLEDevice::createServer()->getAdvertising()->start();
+  }
+  digitalWrite(2, HIGH);
+}
+
+void loop() {}'
+
+CIRCUITRUN_ESP32_S3_RADIO_BUILD_STDIN='{
+  "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [],
+    "nets": []
+  },
+  "scenario": {
+    "duration_ms": 1000,
+    "stimuli": []
+  },
+  "checks": [
+    {
+      "type": "pin-state",
+      "id": "runs-on",
+      "pin": "GPIO2",
+      "level": "high",
+      "after_ms": 500
+    }
+  ],
+  "artifacts": {
+    "enabled": ["result.json"]
+  },
+  "limits": {
+    "max_wall_ms": 20000
+  },
+  "context": {
+    "question_id": "judge0-bounds",
+    "test_case_id": "esp32-s3-radio-build"
+  }
+}'
+
+# circuitrun's cases/mqtt-lab/busy.ino, with that case's parts and first check.
+CIRCUITRUN_ESP32_S3_MQTT_BUSY='#include <ArduinoJson.h>
+#include <DHT.h>
+#include <PubSubClient.h>
+#include <WiFi.h>
+
+const int LED = 2;
+DHT dht(4, DHT22);
+WiFiClient net;
+PubSubClient mqtt(net);
+unsigned long lastPublish = 0;
+
+void onMessage(char *topic, byte *payload, unsigned int length) {
+  String message;
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.printf("message %s %s\n", topic, message.c_str());
+  if (message == "1") {
+    digitalWrite(LED, HIGH);
+  } else if (message == "0") {
+    digitalWrite(LED, LOW);
+  }
+}
+
+void reconnect() {
+  while (!mqtt.connected()) {
+    if (mqtt.connect("esp32-lab-01")) {
+      Serial.println("mqtt connected");
+      mqtt.publish("lab/status", "online", true);
+      mqtt.subscribe("lab/led", 1);
+    } else {
+      Serial.printf("mqtt failed, state %d\n", mqtt.state());
+      delay(1000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED, OUTPUT);
+  dht.begin();
+  WiFi.begin("lab-ap", "secret123");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+  }
+  mqtt.setServer("broker.lab.test", 1883);
+  mqtt.setCallback(onMessage);
+  mqtt.setKeepAlive(5);
+}
+
+void loop() {
+  if (!mqtt.connected()) {
+    reconnect();
+  }
+  mqtt.loop();
+  if (millis() - lastPublish >= 2000) {
+    lastPublish = millis();
+    JsonDocument doc;
+    doc["device"] = "esp32-lab-01";
+    doc["temp_c"] = dht.readTemperature();
+    char payload[96];
+    serializeJson(doc, payload);
+    mqtt.publish("lab/temp", payload);
+    Serial.printf("published %s\n", payload);
+  }
+}'
+
+CIRCUITRUN_ESP32_S3_MQTT_BUSY_STDIN='{
+  "schema_version": "2026-05-01",
+  "mode": "evaluate",
+  "embedded_system": {
+    "schema_version": "2026-05-01",
+    "parts": [
+      {
+        "id": "ap",
+        "model": "wifi-ap",
+        "attrs": {
+          "ssid": "lab-ap",
+          "password": "secret123"
+        }
+      },
+      {
+        "id": "broker",
+        "model": "mqtt-broker",
+        "attrs": {
+          "hosts": [
+            "broker.lab.test"
+          ]
+        }
+      },
+      {
+        "id": "env",
+        "model": "dht22"
+      }
+    ],
+    "nets": [
+      {
+        "id": "env-data",
+        "nodes": [
+          {
+            "type": "board-pin",
+            "pin": "GPIO4"
+          },
+          {
+            "type": "part-terminal",
+            "part": "env",
+            "terminal": "DATA"
+          }
+        ]
+      },
+      {
+        "id": "env-vcc",
+        "nodes": [
+          {
+            "type": "board-rail",
+            "rail": "3V3"
+          },
+          {
+            "type": "part-terminal",
+            "part": "env",
+            "terminal": "VCC"
+          }
+        ]
+      },
+      {
+        "id": "env-gnd",
+        "nodes": [
+          {
+            "type": "board-rail",
+            "rail": "GND"
+          },
+          {
+            "type": "part-terminal",
+            "part": "env",
+            "terminal": "GND"
+          }
+        ]
+      }
+    ]
+  },
+  "scenario": {
+    "duration_ms": 10000,
+    "stimuli": []
+  },
+  "checks": [
+    {
+      "type": "mqtt-published",
+      "id": "status-retained",
+      "topic": "lab/status",
+      "payload_equals": "online",
+      "retain": true
+    }
+  ],
+  "artifacts": {
+    "enabled": ["result.json"]
+  },
+  "limits": {
+    "max_wall_ms": 20000
+  },
+  "context": {
+    "question_id": "judge0-bounds",
+    "test_case_id": "esp32-s3-mqtt-busy"
+  }
+}'
+
 # C + Lex/Yacc 3010 — source_code is a bundle of files, each starting with a
 # "/* ==== FILE: name ==== */" marker line; each bundle starts with the one
 # leading newline the build drops. TLE/OOM are
@@ -452,6 +685,7 @@ for mode in sync async; do
   run "MIPS 3001"        "$mode" 'Accepted' 3001 "$MIPS_HELLO"
   run "CircuitRun 3009" "$mode" 'Accepted' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_OPTS" "$CIRCUITRUN_ARDUINO_STDIN" 'CIRCUITRUN_EVALUATE_ACCEPTED'
   run "CircuitRun S3 3011" "$mode" 'Accepted' 3011 "$CIRCUITRUN_ESP32_S3_HELLO" '{}' "$CIRCUITRUN_ESP32_S3_STDIN" 'CIRCUITRUN_EVALUATE_ACCEPTED'
+  run "CircuitRun S3 radio" "$mode" 'Accepted' 3011 "$CIRCUITRUN_ESP32_S3_RADIO_BUILD" '{}' "$CIRCUITRUN_ESP32_S3_RADIO_BUILD_STDIN" 'CIRCUITRUN_EVALUATE_ACCEPTED'
   run "C+Lex/Yacc 3010"  "$mode" 'Accepted' 3010 "$CDLAB_HELLO" '{}' "$CDLAB_HELLO_STDIN" 'Hello, Newton!'
 
   echo "── TLE: cpu_time_limit=1, busy loop ──"
@@ -478,6 +712,7 @@ for mode in sync async; do
   run "MIPS TLE"         "$mode" 'Time Limit'  3001 "$MIPS_TLE"    "$TLE_OPTS"
   run "CircuitRun TLE" "$mode" 'Time Limit' 3009 "$CIRCUITRUN_ARDUINO_HELLO" "$CIRCUITRUN_TLE_OPTS" "$CIRCUITRUN_ARDUINO_STDIN"
   run "CircuitRun S3 TLE" "$mode" 'Time Limit' 3011 "$CIRCUITRUN_ESP32_S3_POLL" "$TLE_OPTS" "$CIRCUITRUN_ESP32_S3_POLL_STDIN"
+  run "CircuitRun S3 MQTT TLE" "$mode" 'Time Limit' 3011 "$CIRCUITRUN_ESP32_S3_MQTT_BUSY" "$CIRCUITRUN_TLE_OPTS" "$CIRCUITRUN_ESP32_S3_MQTT_BUSY_STDIN"
   run "C+Lex/Yacc TLE"   "$mode" 'Time Limit'  3010 "$CDLAB_TLE"   "$TLE_OPTS"
 
   echo "── OOM: memory_limit=65536 (64 MB), alloc 200 MB ──"
