@@ -1,6 +1,7 @@
 #!/usr/local/python-3.13.1/bin/python3
 """Run MARS and capture its optional end-of-run state as a Judge0 asset."""
 
+import os
 import re
 import subprocess
 import sys
@@ -21,31 +22,47 @@ MARS = [
 ]
 
 arguments = sys.argv[1:]
-if "me" not in arguments:
-    # Preserve the existing lane's command and exit behavior without a dump.
-    sys.exit(subprocess.run([*MARS, "main.s", *arguments]).returncode)
+has_me = False
+for argument in arguments:
+    if argument.lower() == "pa":
+        break
+    if argument.lower() == "me":
+        has_me = True
+
+if not has_me:
+    # Let bash observe Java's exit status and signals directly.
+    os.execv(MARS[0], [*MARS, "main.s", *arguments])
 
 # MARS sends the post-mortem dump and its error messages to stderr with `me`.
 # ae1/se1 make assembly and runtime failures nonzero instead of Accepted.
-command = [*MARS, *arguments, "ae1", "se1", "main.s"]
-result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-state = []
-errors = []
-for line in result.stderr.splitlines(keepends=True):
-    if STATE_LINE.match(line):
-        name, _, value = line.partition(b"\t")
-        if name.startswith(b"$") and name[1:] in REGISTER_NUMBERS:
-            name = f"${REGISTER_NUMBERS[name[1:]]} (".encode() + name + b")"
-        state.append(name + b"\t" + value)
-    elif line.strip():
-        errors.append(line)
+command = [*MARS, "ae1", "se1", "main.s", *arguments]
+state_path = Path("mars-state.txt")
+state_file = None
+try:
+    with subprocess.Popen(command, stderr=subprocess.PIPE) as process:
+        for line in process.stderr:
+            if STATE_LINE.match(line):
+                name, _, value = line.partition(b"\t")
+                if name.startswith(b"$") and name[1:] in REGISTER_NUMBERS:
+                    name = f"${REGISTER_NUMBERS[name[1:]]} (".encode() + name + b")"
+                if state_file is None:
+                    state_file = state_path.open("wb", buffering=0)
+                state_file.write(name + b"\t" + value)
+            elif (
+                line.startswith(b"Program terminated when maximum step limit ")
+                and line.rstrip().endswith(b" reached.")
+            ):
+                # `me` moves this MARS notice to stderr; the old lane showed it on stdout.
+                sys.stdout.buffer.write(b"\n" + line + b"\n")
+                sys.stdout.buffer.flush()
+            elif line.strip():
+                sys.stderr.buffer.write(line)
+                sys.stderr.buffer.flush()
+        returncode = process.wait()
+finally:
+    if state_file is None:
+        state_path.unlink(missing_ok=True)
+    else:
+        state_file.close()
 
-if state:
-    Path("mars-state.txt").write_bytes(b"".join(state))
-else:
-    Path("mars-state.txt").unlink(missing_ok=True)
-
-sys.stdout.buffer.write(result.stdout)
-sys.stderr.buffer.write(b"".join(errors))
-
-sys.exit(result.returncode)
+sys.exit(returncode if returncode >= 0 else 128 - returncode)

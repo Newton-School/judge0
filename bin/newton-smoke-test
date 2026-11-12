@@ -200,6 +200,52 @@ t_ce() {
     fi
 }
 
+# t_mips_case <name> <source> <arguments> <status> <stdout> <stderr_substring> <asset: yes|no> [<state_substring>] [<stdout_mode>]
+# MARS has no compile step, so both assembly and runtime failures are NZEC.
+t_mips_case() {
+    local name="$1" src="$2" args="$3" expected_status="$4"
+    local expected_stdout="$5" expected_stderr="$6" expected_asset="$7" expected_state="${8:-}"
+    local stdout_mode="${9:-exact}"
+    local payload resp status stdout stderr token asset state_text ok=1
+    payload="$(jq -nc --arg sc "$src" --arg args "$args" \
+        '{language_id:3001, source_code:$sc, command_line_arguments:$args}')"
+    resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=token,stdout,stderr,status,assets" \
+        -H 'Content-Type: application/json' -d "$payload")"
+    status="$(echo "$resp" | jq -r '.status.description // "?"')"
+    stdout="$(echo "$resp" | jq -r '.stdout // ""')"
+    stderr="$(echo "$resp" | jq -r '.stderr // ""')"
+    token="$(echo "$resp" | jq -r '.token // ""')"
+    asset="$(echo "$resp" | jq -c '.assets // [] | map(select(.logical_name == "mars-state.txt")) | .[0] // {}')"
+    [[ "$status" == "$expected_status" ]] || ok=0
+    if [[ "$stdout_mode" == "contains" ]]; then
+        [[ "$stdout" == *"$expected_stdout"* ]] || ok=0
+    else
+        [[ "$stdout" == "$expected_stdout" ]] || ok=0
+    fi
+    if [[ -n "$expected_stderr" ]]; then
+        [[ "$stderr" == *"$expected_stderr"* ]] || ok=0
+    else
+        [[ -z "$stderr" ]] || ok=0
+    fi
+    if [[ "$expected_asset" == "yes" ]]; then
+        [[ "$(echo "$asset" | jq -r '.size_bytes // 0')" -gt 0 ]] || ok=0
+        [[ "$(echo "$asset" | jq -r '.error // empty')" == "" ]] || ok=0
+        state_text="$(curl -s "${URL}/submissions/$token/assets/mars-state.txt" | jq -r '.data // "" | @base64d')"
+        [[ "$state_text" == *"$expected_state"* ]] || ok=0
+    else
+        [[ "$asset" == '{}' ]] || ok=0
+    fi
+    if [[ "$ok" -eq 1 ]]; then
+        printf "  \033[32mPASS\033[0m  %s\n" "$name"
+        PASS=$((PASS+1))
+    else
+        printf "  \033[31mFAIL\033[0m  %s  status=%s stdout=%q stderr=%q asset=%s\n" \
+            "$name" "$status" "$stdout" "$stderr" "$asset"
+        FAIL=$((FAIL+1))
+        FAILED+=("$name")
+    fi
+}
+
 skip() {
     local name="$1" reason="$2"
     printf "  \033[33mSKIP\033[0m  %s  (%s)\n" "$name" "$reason"
@@ -294,6 +340,29 @@ msg:    .asciiz "Hello, Newton!\n"
 main:
         li      $v0, 4
         la      $a0, msg
+        syscall
+        li      $v0, 10
+        syscall'
+
+SRC_MIPS_RUNTIME_ERROR='        .text
+main:
+        li      $t0, 1
+        lw      $t1, 0($t0)'
+
+SRC_MIPS_ASSEMBLY_ERROR='        .text
+main:
+        not_an_instruction $t0, $t1'
+
+SRC_MIPS_ARGC='        .text
+main:
+        li      $v0, 1
+        syscall
+        li      $v0, 10
+        syscall'
+
+SRC_MIPS_READ_INT='        .text
+main:
+        li      $v0, 5
         syscall
         li      $v0, 10
         syscall'
@@ -817,6 +886,15 @@ t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
 t_stdin_with_asset "MIPS 3001 with mars-state.txt" 3001 \
     "$SRC_MIPS" "" "$EXPECTED" "mars-state.txt" "" "Accepted" \
     "me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c"
+t_mips_case "MIPS runtime error with ME (3001)" "$SRC_MIPS_RUNTIME_ERROR" \
+    "ME dec t0 t1" "Runtime Error (NZEC)" "" "Runtime exception" "yes" $'$8 ($t0)\t1'
+t_mips_case "MIPS assembly error with me (3001)" "$SRC_MIPS_ASSEMBLY_ERROR" \
+    "me" "Runtime Error (NZEC)" "" "Error in" "no"
+t_mips_case "MIPS me with pa arguments (3001)" "$SRC_MIPS_ARGC" \
+    "me t0 pa x y" "Accepted" "2" "" "yes" '$8 ($t0)'
+t_mips_case "MIPS empty stdin retains step-limit notice (3001)" "$SRC_MIPS_READ_INT" \
+    "me" "Accepted" "Program terminated when maximum step limit -1 reached." \
+    "Exception in thread" "no" "" "contains"
 
 # HDL drives the chip via a .tst-style script in stdin and prints a
 # truth-table to stdout. With a=1 b=0 sel=0 → out=1 (selecting a).
