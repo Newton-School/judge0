@@ -313,6 +313,7 @@
       { name: "waveform.json", identification: '\Aartifacts/waveform\.json\z', max_size: 1_048_576 },
       { name: "serial.log", identification: '\Aartifacts/serial\.log\z', max_size: 1_048_576 },
       { name: "devices.json", identification: '\Aartifacts/devices\.json\z', max_size: 1_048_576 },
+      { name: "network.json", identification: '\Aartifacts/network\.json\z', max_size: 1_048_576 },
       { name: "timing.json", identification: '\Aartifacts/timing\.json\z', max_size: 1_048_576 }
     ]
   }

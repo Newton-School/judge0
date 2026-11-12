@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:c51f91f531a5…` (label 0.40) | what we layer on; compilers CI tags by commit SHA, not semver |
+| Compiler base | `newtonschool/judge0-newton-compiler:86b41a5fd547…` (label 0.41) | what we layer on; compilers CI tags by commit SHA, not semver |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -192,13 +192,19 @@ language ids exist and what they invoke. Editing it requires a
   job, so run it locally before merging).
 
 - **CircuitRun ESP32-S3 DevKitC-1 id 3011.** Same stdin payload and asset
-  names as 3009, each asset with a 1 MiB `max_size` (production's
+  names as 3009 plus `network.json` (the simulated Wi-Fi and BLE traffic),
+  each asset with a 1 MiB `max_size` (production's
   `MAX_MAX_ASSET_SIZE` of 40960 bytes caps it). `compile_cmd` builds
   the firmware (`build/firmware.bin`, a 4 MiB flash image) under judge0's
   `MAX_*` limits with no stdin, and `run_cmd` boots it in the CircuitRun
   dist's patched QEMU (`qemu-system-xtensa`) and grades it. A sketch error
   is a Compilation Error with gcc's `main.ino:<line>:` text. Needs a
-  compilers image whose Tier 13 pins the Uno + ESP32-S3 dist (label 0.40+).
+  compilers image whose Tier 13 pins the Uno + ESP32-S3 dist (label 0.40+);
+  the simulated radio and `network.json` need its radio dist (label 0.41+),
+  as an older runner refuses a request that enables `network.json`. A
+  sketch that uses a radio feature the simulator doesn't model (a Soft-AP,
+  ESP-NOW, a BLE scan) makes the runner exit 1: a Runtime Error whose
+  stderr and `result.json` give the reason.
   The compile needs `MAX_MAX_FILE_SIZE` of at least 8192 KB (blink fails
   at 4096 KB). Under `MAX_MEMORY_LIMIT` (512000 KB on the public prod
   stack) blink, a `<bits/stdc++.h>` sketch with a few containers and a
@@ -256,8 +262,9 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 
 Submits a hello-world or equivalent behavioral smoke for every active language
 id. Expected after `man` support on top of 0.76, plus the four 3010 cases
-and 3011's three (accepted, its result asset, a compile error):
-**39 PASS / 0 FAIL / 0 SKIP** on amd64; **37 PASS / 0 FAIL / 2 SKIP** on
+and 3011's nine (blink, Wi-Fi and BLE accepted and a Soft-AP Runtime Error,
+each with its asset row; a compile error):
+**45 PASS / 0 FAIL / 0 SKIP** on amd64; **43 PASS / 0 FAIL / 2 SKIP** on
 arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
 CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
 contributes three (hello-world, `man`, `whatis`).
@@ -266,8 +273,9 @@ Two companions move with the smoke test when a language is added:
 `bin/newton-postman.json` mirrors its cases as importable Postman requests
 (folders follow the smoke sections, same case names), and
 `bin/newton-bounds-test` probes HELLO / TLE (`cpu_time_limit=1`) / OOM
-(64 MB cap, 200 MB alloc) per language in sync and async mode — 68 probes
-per mode with 3011 (25 HELLO + 24 TLE + 18 OOM + 1 CircuitRun 3009 low-memory).
+(64 MB cap, 200 MB alloc) per language in sync and async mode — 70 probes
+per mode with 3011's radio probes (26 HELLO + 25 TLE + 18 OOM + 1 CircuitRun
+3009 low-memory).
 
 **Plain-text API mode cannot return non-ASCII output.** judge0 stores
 stdout/stderr/compile_output base64-encoded and decodes them as binary,
@@ -362,10 +370,12 @@ in `judge0.conf` explain each. Summary:
   `0.x` numbering lives solely in that repo's
   `org.opencontainers.image.version` label — a semver tag for a new build
   will not exist. `NewtonDockerfile` pins
-  `c51f91f531a575827231b61f0148a7a5d36d451a` (Newton-School/compilers#26,
-  label 0.40: CircuitRun ESP32-S3 for lane 3011), pushed by the compilers
-  workflow as `:<sha>` and `:latest` (digest `sha256:526537d7…`). It sits
-  on #23 (label 0.39: Tier 15 flex/bison/libfl/liby for lane 3010, built by
+  `86b41a5fd5479e8fa00641bb3c612aa4209704c4` (Newton-School/compilers#27,
+  label 0.41: CircuitRun ESP32-S3 Wi-Fi and BLE for lane 3011), pushed by
+  the compilers workflow as `:<sha>` and `:latest` (digest
+  `sha256:ed01ff27…`). It sits on #26 (label 0.40: CircuitRun ESP32-S3 for
+  lane 3011, `c51f91f531a5…`, digest `sha256:526537d7…`), on #23 (label
+  0.39: Tier 15 flex/bison/libfl/liby for lane 3010, built by
   hand on the build box as `:f8f215eac832…` and `:0.39`, digest
   `sha256:e7ffeab5…`), on #22, which caps CircuitRun's arduino-cli at
   `--jobs 4` / `GOMAXPROCS=4` so Arduino builds fit isolate's
