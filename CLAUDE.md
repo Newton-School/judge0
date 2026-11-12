@@ -37,7 +37,7 @@ compilers image). Don't conflate them.
 │   ├── load-config                  # sources judge0.conf, sets RAILS env
 │   └── dev/{shell,bundle,clean,...} # dev helpers
 ├── bin/
-│   ├── newton-smoke-test            # end-to-end smoke, every active language id (39 checks on amd64)
+│   ├── newton-smoke-test            # end-to-end smoke, every active language id (51 checks on amd64)
 │   ├── newton-postman.json          # Postman mirror of newton-smoke-test (same sections + case names)
 │   ├── newton-bounds-test           # HELLO / TLE / OOM enforcement probes, sync + async
 │   ├── lint-active-rb               # active.rb + archived.rb lint (also runs at image build)
@@ -45,7 +45,7 @@ compilers image). Don't conflate them.
 ├── db/
 │   ├── languages/active.rb          # canonical language id → command map
 │   ├── languages/archived.rb        # historical/dropped languages
-│   ├── languages/helpers/           # sandbox-side compile helpers → /usr/local/bin (3010)
+│   ├── languages/helpers/           # sandbox-side helpers → /usr/local/bin (3001 newton-mars-run, 3010)
 │   ├── seeds.rb                     # loads active.rb + archived.rb into DB
 │   └── migrate/                     # rails migrations (don't add new ones lightly)
 ├── app/jobs/isolate_job.rb          # the sandbox runner — most complex Ruby in the repo
@@ -155,6 +155,29 @@ language ids exist and what they invoke. Editing it requires a
   GET returns asset metadata when `fields=...,assets`; bytes via
   `GET /submissions/:token/assets/:logical_name`. Full design in
   `docs/superpowers/specs/2026-05-05-submission-assets-design.md`.
+- **MIPS Mars 4.5 id 3001.** A caller that includes `me` in
+  `command_line_arguments` opts into the `mars-state.txt` submission
+  asset. `newton-mars-run` captures the requested register and memory
+  dump while keeping MARS errors on stderr. With `me`, it also supplies
+  `ae1 se1`, so assembly and runtime errors return Runtime Error (NZEC)
+  instead of Accepted (3001 has no compile step). The asset uses these
+  tab-separated lines:
+  - Integer register: `$N ($name)<TAB><value>` (for example `$8 ($t0)`).
+  - FP register: `$fN<TAB><value>`; even-numbered FP registers also have
+    a second, double-precision value.
+  - Memory row: `Mem[0x…]` followed by a tab, one to four tab-separated
+    word values, and a trailing tab. The first row starts at the requested
+    start address, not a 16-byte boundary; each later row starts 16 bytes
+    after the previous one. The final row may contain fewer than four words.
+
+  No asset is returned without `me`, after an assembly error, or when
+  no registers or memory ranges were requested. The lane declares a
+  40,960-byte `max_size`; `MAX_MAX_ASSET_SIZE` can lower the effective
+  cap. Callers that do not need the snapshot (for example hidden test
+  cases) should send no `command_line_arguments` and set
+  `skip_assets: true`. With `me`, MARS does not append its usual final
+  blank line to stdout. The helper restores MARS's step-limit notice to
+  stdout when one is emitted.
 - **C + Lex/Yacc id 3010 (compiler-design lab).** `source_code` is a
   *bundle*: every file starts with a marker line
   `/* ==== FILE: name.ext ==== */` (`.l .y .c .h`, at most one `.l` and
@@ -163,10 +186,11 @@ language ids exist and what they invoke. Editing it requires a
   `/usr/local/bin/newton-cdlab-build %s`: it splits the bundle **inside
   the sandbox** with the generic `newton-bundle-split`, then runs
   `bison -y -d` → `flex` → GCC 9.5 with id 50's lenient flags (+
-  `compiler_options`, `-ly`/`-lfl`/`-lm`). Both helpers live in
-  `db/languages/helpers/`; `NewtonDockerfile` installs them to
-  `/usr/local/bin` (isolate mounts `/usr`, not `/api`) and runs
-  `newton-cdlab-selftest`, which needs compilers Tier 15 (label 0.39+) —
+  `compiler_options`, `-ly`/`-lfl`/`-lm`). Both 3010 helpers live in
+  `db/languages/helpers/` alongside `newton-mars-run`;
+  `NewtonDockerfile` installs the helpers to `/usr/local/bin` (isolate
+  mounts `/usr`, not `/api`) and runs `newton-cdlab-selftest`, which needs
+  compilers Tier 15 (label 0.39+) —
   the build fails on an older base by design. `compile_output` is a
   stage log: `==> bison -y -d yFile3.y` etc. appears only for a stage
   that printed something or failed, and diagnostics carry bare file names
@@ -261,13 +285,12 @@ JUDGE0_URL=http://localhost:2358 ./bin/newton-smoke-test
 ```
 
 Submits a hello-world or equivalent behavioral smoke for every active language
-id. Expected after `man` support on top of 0.76, plus the four 3010 cases
-and 3011's nine (blink, Wi-Fi and BLE accepted and a Soft-AP Runtime Error,
-each with its asset row; a compile error):
-**45 PASS / 0 FAIL / 0 SKIP** on amd64; **43 PASS / 0 FAIL / 2 SKIP** on
-arm64 (NASM and FreeBASIC are amd64-only upstream). Verilog waveforms and
-CircuitRun result artifacts each add an asset-metadata PASS; the Bash lane
-contributes three (hello-world, `man`, `whatis`).
+id, including MIPS state capture and error paths, plus 3011's Wi-Fi and BLE
+cases and unsupported Soft-AP case. Expected: **51 PASS / 0 FAIL / 0 SKIP**
+on amd64; **49 PASS / 0 FAIL / 2 SKIP** on arm64 (NASM and FreeBASIC are
+amd64-only upstream). Verilog waveforms, CircuitRun result artifacts, and
+MIPS state each add an asset-metadata PASS; the Bash lane contributes three
+(hello-world, `man`, `whatis`).
 
 Two companions move with the smoke test when a language is added:
 `bin/newton-postman.json` mirrors its cases as importable Postman requests
@@ -362,8 +385,8 @@ in `judge0.conf` explain each. Summary:
   bumped 0.29 → 0.33 (which carries `DOTNET_EnableWriteXorExecute=0`
   for the W^X / RLIMIT_FSIZE workaround), propagated into isolate via
   `-E DOTNET_EnableWriteXorExecute` in `IsolateJob`. Smoke target
-  was 28/0/0 at 0.76; it is 39/0/0 on amd64 with lanes 3010 and 3011 (see
-  "End-to-end smoke test").
+  was 28/0/0 at 0.76; it is 51/0/0 on amd64 with lanes 3001, 3010, and
+  3011 (see "End-to-end smoke test").
 - **The compiler base is pinned by commit SHA, not semver.** The compilers
   workflow pushes `judge0-newton-compiler:<git-sha>` and `:latest` only; the
   `0.35`/`0.36` tags on Docker Hub were hand-pushed months ago, and the
