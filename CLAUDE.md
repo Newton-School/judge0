@@ -14,7 +14,7 @@ plus the `isolate` sandbox.
 | Postgres | 13 (dev) | Production uses managed Postgres |
 | Redis | 6.0 + 6.2.6 sidecar | sidecar = secondary cache (separate db) |
 | Resque + Resque-scheduler | 2.0 / 4.4 | submission queue |
-| Compiler base | `newtonschool/judge0-newton-compiler:c51f91f531a5…` (label 0.40) | what we layer on; compilers CI tags by commit SHA, not semver |
+| Compiler base | `newtonschool/judge0-newton-compiler:86b41a5fd547…` (label 0.41) | what we layer on; compilers CI tags by commit SHA, not semver |
 | Sandbox | `isolate` v2.0 in **cgroup v2 mode** (`docker-entrypoint.sh` sets up the hierarchy at startup) | from compilers image |
 
 The Rails app's Ruby (`/usr/local/ruby-2.7.8`, installed in
@@ -370,10 +370,12 @@ in `judge0.conf` explain each. Summary:
   `0.x` numbering lives solely in that repo's
   `org.opencontainers.image.version` label — a semver tag for a new build
   will not exist. `NewtonDockerfile` pins
-  `c51f91f531a575827231b61f0148a7a5d36d451a` (Newton-School/compilers#26,
-  label 0.40: CircuitRun ESP32-S3 for lane 3011), pushed by the compilers
-  workflow as `:<sha>` and `:latest` (digest `sha256:526537d7…`). It sits
-  on #23 (label 0.39: Tier 15 flex/bison/libfl/liby for lane 3010, built by
+  `86b41a5fd5479e8fa00641bb3c612aa4209704c4` (Newton-School/compilers#27,
+  label 0.41: CircuitRun ESP32-S3 Wi-Fi and BLE for lane 3011), pushed by
+  the compilers workflow as `:<sha>` and `:latest` (digest
+  `sha256:ed01ff27…`). It sits on #26 (label 0.40: CircuitRun ESP32-S3 for
+  lane 3011, `c51f91f531a5…`, digest `sha256:526537d7…`), on #23 (label
+  0.39: Tier 15 flex/bison/libfl/liby for lane 3010, built by
   hand on the build box as `:f8f215eac832…` and `:0.39`, digest
   `sha256:e7ffeab5…`), on #22, which caps CircuitRun's arduino-cli at
   `--jobs 4` / `GOMAXPROCS=4` so Arduino builds fit isolate's

@@ -1,9 +1,10 @@
 # Compiler base is pinned to the commit SHA the compilers CI actually pushes;
 # the 0.x numbers in that repo are a doc convention, not published tags.
-# c51f91f = Newton-School/compilers#26 (label 0.40): CircuitRun ESP32-S3 for
-# lane 3011, on top of #23's Tier 15 flex/bison for lane 3010. Pushed by the
-# compilers workflow as :<sha> and :latest (digest sha256:526537d7…).
-FROM newtonschool/judge0-newton-compiler:c51f91f531a575827231b61f0148a7a5d36d451a AS production
+# 86b41a5 = Newton-School/compilers#27 (label 0.41): CircuitRun ESP32-S3 Wi-Fi
+# and BLE for lane 3011, on top of #26's ESP32-S3 and #23's Tier 15 flex/bison
+# for lane 3010. Pushed by the compilers workflow as :<sha> and :latest
+# (digest sha256:ed01ff27…).
+FROM newtonschool/judge0-newton-compiler:86b41a5fd5479e8fa00641bb3c612aa4209704c4 AS production
 
 
 ENV JUDGE0_HOMEPAGE "https://judge0-public.newtonschool.co/"
