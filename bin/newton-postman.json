@@ -330,6 +330,259 @@
           }
         },
         {
+          "name": "MIPS 3001 with mars-state.txt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"Accepted\", () => pm.expect(body.status.description).to.eql(\"Accepted\"));",
+                  "pm.test(\"stdout\", () => pm.expect(body.stdout).to.include(\"Hello, Newton!\"));",
+                  "pm.test(\"stderr is empty\", () => pm.expect(body.stderr || \"\").to.eql(\"\"));",
+                  "pm.test(\"state asset\", () => { const asset = (body.assets || []).find((a) => a.logical_name === \"mars-state.txt\"); pm.expect(asset).to.exist; pm.expect(asset.error).to.be.oneOf([null, undefined, \"\"]); pm.expect(asset.size_bytes).to.be.above(0); });",
+                  "pm.sendRequest(`${pm.collectionVariables.get(\"base_url\")}/submissions/${body.token}/assets/mars-state.txt`, (error, response) => { pm.test(\"state file has numbered registers and memory\", () => { pm.expect(error).to.be.null; pm.expect(response.code).to.eql(200); const state = atob(response.json().data); pm.expect(state).to.include(\"$0 ($zero)\"); pm.expect(state).to.include(\"Mem[0x10010000]\"); }); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/submissions?wait=true&fields=token,stdout,stderr,status,message,compile_output,assets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "wait",
+                  "value": "true"
+                },
+                {
+                  "key": "fields",
+                  "value": "token,stdout,stderr,status,message,compile_output,assets"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .data\\nmsg:    .asciiz \\\"Hello, Newton!\\\\n\\\"\\n        .text\\nmain:\\n        li      $v0, 4\\n        la      $a0, msg\\n        syscall\\n        li      $v0, 10\\n        syscall\",\n  \"command_line_arguments\": \"me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c\"\n}"
+            }
+          }
+        },
+        {
+          "name": "MIPS runtime error with ME (3001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"Runtime Error (NZEC)\", () => pm.expect(body.status.description).to.eql(\"Runtime Error (NZEC)\"));",
+                  "pm.test(\"stdout is empty\", () => pm.expect(body.stdout || \"\").to.eql(\"\"));",
+                  "pm.test(\"stderr contains Runtime exception\", () => pm.expect(body.stderr || \"\").to.include(\"Runtime exception\"));",
+                  "pm.test(\"state asset\", () => { const asset = (body.assets || []).find((a) => a.logical_name === \"mars-state.txt\"); pm.expect(asset).to.exist; pm.expect(asset.error).to.be.oneOf([null, undefined, \"\"]); pm.expect(asset.size_bytes).to.be.above(0); });",
+                  "pm.sendRequest(`${pm.collectionVariables.get(\"base_url\")}/submissions/${body.token}/assets/mars-state.txt`, (error, response) => { pm.test(\"state file contains registers at the crash\", () => { pm.expect(error).to.be.null; pm.expect(response.code).to.eql(200); pm.expect(atob(response.json().data)).to.include(\"$8 ($t0)\\t1\"); }); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/submissions?wait=true&fields=token,stdout,stderr,status,assets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "wait",
+                  "value": "true"
+                },
+                {
+                  "key": "fields",
+                  "value": "token,stdout,stderr,status,assets"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .text\\nmain:\\n        li      $t0, 1\\n        lw      $t1, 0($t0)\",\n  \"command_line_arguments\": \"ME dec t0 t1\"\n}"
+            }
+          }
+        },
+        {
+          "name": "MIPS assembly error with me (3001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"Runtime Error (NZEC)\", () => pm.expect(body.status.description).to.eql(\"Runtime Error (NZEC)\"));",
+                  "pm.test(\"stdout is empty\", () => pm.expect(body.stdout || \"\").to.eql(\"\"));",
+                  "pm.test(\"stderr contains Error in\", () => pm.expect(body.stderr || \"\").to.include(\"Error in\"));",
+                  "pm.test(\"no state asset\", () => pm.expect((body.assets || []).find((a) => a.logical_name === \"mars-state.txt\")).to.be.undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/submissions?wait=true&fields=token,stdout,stderr,status,assets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "wait",
+                  "value": "true"
+                },
+                {
+                  "key": "fields",
+                  "value": "token,stdout,stderr,status,assets"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .text\\nmain:\\n        not_an_instruction $t0, $t1\",\n  \"command_line_arguments\": \"me\"\n}"
+            }
+          }
+        },
+        {
+          "name": "MIPS me with pa arguments (3001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"Accepted\", () => pm.expect(body.status.description).to.eql(\"Accepted\"));",
+                  "pm.test(\"stdout is argc 2\", () => pm.expect(body.stdout).to.eql(\"2\"));",
+                  "pm.test(\"stderr is empty\", () => pm.expect(body.stderr || \"\").to.eql(\"\"));",
+                  "pm.test(\"state asset\", () => { const asset = (body.assets || []).find((a) => a.logical_name === \"mars-state.txt\"); pm.expect(asset).to.exist; pm.expect(asset.error).to.be.oneOf([null, undefined, \"\"]); pm.expect(asset.size_bytes).to.be.above(0); });",
+                  "pm.sendRequest(`${pm.collectionVariables.get(\"base_url\")}/submissions/${body.token}/assets/mars-state.txt`, (error, response) => { pm.test(\"state file contains crash or exit registers\", () => { pm.expect(error).to.be.null; pm.expect(response.code).to.eql(200); pm.expect(atob(response.json().data)).to.include(\"$8 ($t0)\"); }); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/submissions?wait=true&fields=token,stdout,stderr,status,assets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "wait",
+                  "value": "true"
+                },
+                {
+                  "key": "fields",
+                  "value": "token,stdout,stderr,status,assets"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .text\\nmain:\\n        li      $v0, 1\\n        syscall\\n        li      $v0, 10\\n        syscall\",\n  \"command_line_arguments\": \"me t0 pa x y\"\n}"
+            }
+          }
+        },
+        {
+          "name": "MIPS empty stdin retains step-limit notice (3001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"Accepted\", () => pm.expect(body.status.description).to.eql(\"Accepted\"));",
+                  "pm.test(\"step-limit notice stays in stdout\", () => pm.expect(body.stdout || \"\").to.include(\"Program terminated when maximum step limit -1 reached.\"));",
+                  "pm.test(\"Java exception stays in stderr\", () => pm.expect(body.stderr || \"\").to.include(\"Exception in thread\"));",
+                  "pm.test(\"no state asset\", () => pm.expect((body.assets || []).find((a) => a.logical_name === \"mars-state.txt\")).to.be.undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/submissions?wait=true&fields=token,stdout,stderr,status,assets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "wait",
+                  "value": "true"
+                },
+                {
+                  "key": "fields",
+                  "value": "token,stdout,stderr,status,assets"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .text\\nmain:\\n        li      $v0, 5\\n        syscall\\n        li      $v0, 10\\n        syscall\",\n  \"stdin\": \"\",\n  \"command_line_arguments\": \"me\"\n}"
+            }
+          }
+        },
+        {
           "name": "HDL Nand2Tetris (3000)",
           "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"Accepted\", () => pm.expect(pm.response.json().status.description).to.eql(\"Accepted\"));", "pm.test(\"truth table row\", () => pm.expect(pm.response.json().stdout).to.include(\"|   1   |   0   |   0   |   1   |\"));"]}}],
           "request": {
