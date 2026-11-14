@@ -153,12 +153,19 @@ language ids exist and what they invoke. Editing it requires a
   Validation runs at seed time (fails container boot on bad regex)
   and via `bin/lint-active-rb` (CI gate). API: extended submission
   GET returns asset metadata when `fields=...,assets`; bytes via
-  `GET /submissions/:token/assets/:logical_name`. Full design in
+  `GET /submissions/:token/assets/:logical_name`. To fetch multiple files in
+  one request, use `GET /submissions/:token/assets?file=one.txt,two.txt`;
+  the response is `{ "data": { "one.txt": "<base64>", ... } }` and omits
+  unavailable files. The single-file URL remains supported. Full design in
   `docs/superpowers/specs/2026-05-05-submission-assets-design.md`.
 - **MIPS Mars 4.5 id 3001.** A caller that includes `me` in
-  `command_line_arguments` opts into the `mars-state.txt` submission
-  asset. `newton-mars-run` captures the requested register and memory
-  dump while keeping MARS errors on stderr. With `me`, it also supplies
+  `command_line_arguments` opts into `mars-state.txt` and `mars-text.txt`
+  submission assets. `newton-mars-run` captures the register and memory
+  dump, adds bounded windows for Data, External Data, Heap, Stack, Kernel
+  Data, and MMIO, and uses MARS's `SegmentWindow` dump for assembled Address,
+  Code, Basic, and Source columns. The Stack window covers the 2 KB below
+  MARS's initial `$sp`, keeping hexadecimal dumps within the local 20 KB asset
+  cap. It keeps MARS errors on stderr. With `me`, it also supplies
   `ae1 se1`, so assembly and runtime errors return Runtime Error (NZEC)
   instead of Accepted (3001 has no compile step). The asset uses these
   tab-separated lines:
@@ -170,11 +177,10 @@ language ids exist and what they invoke. Editing it requires a
     start address, not a 16-byte boundary; each later row starts 16 bytes
     after the previous one. The final row may contain fewer than four words.
 
-  No asset is returned without `me`, after an assembly error, or when
-  no registers or memory ranges were requested. The lane declares a
-  40,960-byte `max_size`; `MAX_MAX_ASSET_SIZE` can lower the effective
-  cap. Callers that do not need the snapshot (for example hidden test
-  cases) should send no `command_line_arguments` and set
+  No asset is returned without `me` or after an assembly error. The lane
+  declares a 40,960-byte `max_size` for each asset; `MAX_MAX_ASSET_SIZE`
+  can lower the effective cap. Callers that do not need the snapshot (for
+  example hidden test cases) should send no `command_line_arguments` and set
   `skip_assets: true`. With `me`, MARS does not append its usual final
   blank line to stdout. The helper restores MARS's step-limit notice to
   stdout when one is emitted.
@@ -289,7 +295,7 @@ id, including MIPS state capture and error paths, plus 3011's Wi-Fi and BLE
 cases and unsupported Soft-AP case. Expected: **51 PASS / 0 FAIL / 0 SKIP**
 on amd64; **49 PASS / 0 FAIL / 2 SKIP** on arm64 (NASM and FreeBASIC are
 amd64-only upstream). Verilog waveforms, CircuitRun result artifacts, and
-MIPS state each add an asset-metadata PASS; the Bash lane contributes three
+MIPS state and text add asset checks; the Bash lane contributes three
 (hello-world, `man`, `whatis`).
 
 Two companions move with the smoke test when a language is added:

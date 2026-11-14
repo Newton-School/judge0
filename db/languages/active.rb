@@ -179,7 +179,8 @@
     source_file: "main.s",
     run_cmd: "/usr/local/bin/newton-mars-run",
     assets: [
-      { name: "mars-state.txt", identification: '\Amars-state\.txt\z', max_size: 40960 }
+      { name: "mars-state.txt", identification: '\Amars-state\.txt\z', max_size: 40960 },
+      { name: "mars-text.txt", identification: '\Amars-text\.txt\z', max_size: 40960 }
     ]
   },
   {

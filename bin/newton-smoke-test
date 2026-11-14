@@ -200,13 +200,14 @@ t_ce() {
     fi
 }
 
-# t_mips_case <name> <source> <arguments> <status> <stdout> <stderr_substring> <asset: yes|no> [<state_substring>] [<stdout_mode>]
+# t_mips_case <name> <source> <arguments> <status> <stdout> <stderr_substring> <asset: yes|no> [<state_substring>] [<stdout_mode>] [<text_substring>]
 # MARS has no compile step, so both assembly and runtime failures are NZEC.
 t_mips_case() {
     local name="$1" src="$2" args="$3" expected_status="$4"
     local expected_stdout="$5" expected_stderr="$6" expected_asset="$7" expected_state="${8:-}"
-    local stdout_mode="${9:-exact}"
-    local payload resp status stdout stderr token asset state_text ok=1
+    local stdout_mode="${9:-exact}" expected_text="${10:-}"
+    local payload resp status stdout stderr token asset state_text text_asset text_body files
+    local run_ok=1 asset_ok=1
     payload="$(jq -nc --arg sc "$src" --arg args "$args" \
         '{language_id:3001, source_code:$sc, command_line_arguments:$args}')"
     resp="$(curl -s -X POST "${URL}/submissions?wait=true&fields=token,stdout,stderr,status,assets" \
@@ -216,26 +217,44 @@ t_mips_case() {
     stderr="$(echo "$resp" | jq -r '.stderr // ""')"
     token="$(echo "$resp" | jq -r '.token // ""')"
     asset="$(echo "$resp" | jq -c '.assets // [] | map(select(.logical_name == "mars-state.txt")) | .[0] // {}')"
-    [[ "$status" == "$expected_status" ]] || ok=0
+    [[ "$status" == "$expected_status" ]] || run_ok=0
     if [[ "$stdout_mode" == "contains" ]]; then
-        [[ "$stdout" == *"$expected_stdout"* ]] || ok=0
+        [[ "$stdout" == *"$expected_stdout"* ]] || run_ok=0
     else
-        [[ "$stdout" == "$expected_stdout" ]] || ok=0
+        [[ "$stdout" == "$expected_stdout" ]] || run_ok=0
     fi
     if [[ -n "$expected_stderr" ]]; then
-        [[ "$stderr" == *"$expected_stderr"* ]] || ok=0
+        [[ "$stderr" == *"$expected_stderr"* ]] || run_ok=0
     else
-        [[ -z "$stderr" ]] || ok=0
+        [[ -z "$stderr" ]] || run_ok=0
     fi
     if [[ "$expected_asset" == "yes" ]]; then
-        [[ "$(echo "$asset" | jq -r '.size_bytes // 0')" -gt 0 ]] || ok=0
-        [[ "$(echo "$asset" | jq -r '.error // empty')" == "" ]] || ok=0
-        state_text="$(curl -s "${URL}/submissions/$token/assets/mars-state.txt" | jq -r '.data // "" | @base64d')"
-        [[ "$state_text" == *"$expected_state"* ]] || ok=0
+        [[ "$(echo "$asset" | jq -r '.size_bytes // 0')" -gt 0 ]] || asset_ok=0
+        [[ "$(echo "$asset" | jq -r '.error // empty')" == "" ]] || asset_ok=0
+        if [[ -n "$expected_text" ]]; then
+            files="$(curl -s "${URL}/submissions/$token/assets?file=mars-state.txt,mars-text.txt")"
+            state_text="$(echo "$files" | jq -r '.data["mars-state.txt"] // "" | @base64d')"
+            text_body="$(echo "$files" | jq -r '.data["mars-text.txt"] // "" | @base64d')"
+        else
+            state_text="$(curl -s "${URL}/submissions/$token/assets/mars-state.txt" | jq -r '.data // "" | @base64d')"
+        fi
+        [[ "$state_text" == *"$expected_state"* ]] || asset_ok=0
     else
-        [[ "$asset" == '{}' ]] || ok=0
+        [[ "$asset" == '{}' ]] || asset_ok=0
     fi
-    if [[ "$ok" -eq 1 ]]; then
+    if [[ -n "$expected_text" ]]; then
+        local region
+        for region in \
+            'Mem[0x10000000]' 'Mem[0x10010000]' 'Mem[0x10040000]' \
+            'Mem[0x7fffe800]' 'Mem[0x90000000]' 'Mem[0xffff0000]'; do
+            [[ "$state_text" == *"$region"* ]] || asset_ok=0
+        done
+        text_asset="$(echo "$resp" | jq -c '.assets // [] | map(select(.logical_name == "mars-text.txt")) | .[0] // {}')"
+        [[ "$(echo "$text_asset" | jq -r '.size_bytes // 0')" -gt 0 ]] || asset_ok=0
+        [[ "$(echo "$text_asset" | jq -r '.error // empty')" == "" ]] || asset_ok=0
+        [[ "$text_body" == *"$expected_text"* ]] || asset_ok=0
+    fi
+    if [[ "$run_ok" -eq 1 && ( -n "$expected_text" || "$asset_ok" -eq 1 ) ]]; then
         printf "  \033[32mPASS\033[0m  %s\n" "$name"
         PASS=$((PASS+1))
     else
@@ -243,6 +262,17 @@ t_mips_case() {
             "$name" "$status" "$stdout" "$stderr" "$asset"
         FAIL=$((FAIL+1))
         FAILED+=("$name")
+    fi
+    if [[ -n "$expected_text" ]]; then
+        if [[ "$asset_ok" -eq 1 ]]; then
+            printf "  \033[32mPASS\033[0m  %s assets\n" "$name"
+            PASS=$((PASS+1))
+        else
+            printf "  \033[31mFAIL\033[0m  %s assets  state=%s text=%s\n" \
+                "$name" "$asset" "$text_asset"
+            FAIL=$((FAIL+1))
+            FAILED+=("$name assets")
+        fi
     fi
 }
 
@@ -883,9 +913,9 @@ esac
 section "Newton extras"
 # ────────────────────────────────────────────────────────────────────────
 t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
-t_stdin_with_asset "MIPS 3001 with mars-state.txt" 3001 \
-    "$SRC_MIPS" "" "$EXPECTED" "mars-state.txt" "" "Accepted" \
-    "me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c"
+t_mips_case "MIPS 3001 with state and text" "$SRC_MIPS" \
+    "me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c" \
+    "Accepted" "$EXPECTED" "" "yes" '$0 ($zero)' "exact" "0x24020004"
 t_mips_case "MIPS runtime error with ME (3001)" "$SRC_MIPS_RUNTIME_ERROR" \
     "ME dec t0 t1" "Runtime Error (NZEC)" "" "Runtime exception" "yes" $'$8 ($t0)\t1'
 t_mips_case "MIPS assembly error with me (3001)" "$SRC_MIPS_ASSEMBLY_ERROR" \
@@ -894,7 +924,7 @@ t_mips_case "MIPS me with pa arguments (3001)" "$SRC_MIPS_ARGC" \
     "me t0 pa x y" "Accepted" "2" "" "yes" '$8 ($t0)'
 t_mips_case "MIPS empty stdin retains step-limit notice (3001)" "$SRC_MIPS_READ_INT" \
     "me" "Accepted" "Program terminated when maximum step limit -1 reached." \
-    "Exception in thread" "no" "" "contains"
+    "Exception in thread" "yes" 'Mem[0x10010000]' "contains"
 
 # HDL drives the chip via a .tst-style script in stdin and prints a
 # truth-table to stdout. With a=1 b=0 sel=0 → out=1 (selecting a).
