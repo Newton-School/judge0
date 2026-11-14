@@ -330,7 +330,7 @@
           }
         },
         {
-          "name": "MIPS 3001 with mars-state.txt",
+          "name": "MIPS 3001 with state and text",
           "event": [
             {
               "listen": "test",
@@ -342,7 +342,8 @@
                   "pm.test(\"stdout\", () => pm.expect(body.stdout).to.include(\"Hello, Newton!\"));",
                   "pm.test(\"stderr is empty\", () => pm.expect(body.stderr || \"\").to.eql(\"\"));",
                   "pm.test(\"state asset\", () => { const asset = (body.assets || []).find((a) => a.logical_name === \"mars-state.txt\"); pm.expect(asset).to.exist; pm.expect(asset.error).to.be.oneOf([null, undefined, \"\"]); pm.expect(asset.size_bytes).to.be.above(0); });",
-                  "pm.sendRequest(`${pm.collectionVariables.get(\"base_url\")}/submissions/${body.token}/assets/mars-state.txt`, (error, response) => { pm.test(\"state file has numbered registers and memory\", () => { pm.expect(error).to.be.null; pm.expect(response.code).to.eql(200); const state = atob(response.json().data); pm.expect(state).to.include(\"$0 ($zero)\"); pm.expect(state).to.include(\"Mem[0x10010000]\"); }); });"
+                  "pm.test(\"text asset\", () => { const asset = (body.assets || []).find((a) => a.logical_name === \"mars-text.txt\"); pm.expect(asset).to.exist; pm.expect(asset.error).to.be.oneOf([null, undefined, \"\"]); pm.expect(asset.size_bytes).to.be.above(0); });",
+                  "pm.sendRequest(`${pm.collectionVariables.get(\"base_url\")}/submissions/${body.token}/assets?file=mars-state.txt,mars-text.txt`, (error, response) => { pm.test(\"state and text files in one response\", () => { pm.expect(error).to.be.null; pm.expect(response.code).to.eql(200); const files = response.json().data; const state = atob(files[\"mars-state.txt\"]); const text = atob(files[\"mars-text.txt\"]); pm.expect(state).to.include(\"$0 ($zero)\"); [\"0x10000000\",\"0x10010000\",\"0x10040000\",\"0x7fffe800\",\"0x90000000\",\"0xffff0000\"].forEach(address => pm.expect(state).to.include(`Mem[${address}]`)); pm.expect(text).to.include(\"0x23bdfffc\\taddi $29,$29,0xfffffffc\"); pm.expect(text).to.include(\"li      $t3, 1\"); }); });"
                 ]
               }
             }
@@ -376,7 +377,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .data\\nmsg:    .asciiz \\\"Hello, Newton!\\\\n\\\"\\n        .text\\nmain:\\n        li      $v0, 4\\n        la      $a0, msg\\n        syscall\\n        li      $v0, 10\\n        syscall\",\n  \"command_line_arguments\": \"me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c\"\n}"
+              "raw": "{\n  \"language_id\": 3001,\n  \"source_code\": \"        .data\\nmsg:    .asciiz \\\"Hello, Newton!\\\\n\\\"\\n        .text\\nmain:\\n        li      $t3, 1\\n        addi    $sp, $sp, -4\\n        addi    $sp, $sp, 4\\n        li      $v0, 4\\n        la      $a0, msg\\n        syscall\\n        li      $v0, 10\\n        syscall\",\n  \"command_line_arguments\": \"me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c\"\n}"
             }
           }
         },
@@ -544,7 +545,7 @@
                   "pm.test(\"Accepted\", () => pm.expect(body.status.description).to.eql(\"Accepted\"));",
                   "pm.test(\"step-limit notice stays in stdout\", () => pm.expect(body.stdout || \"\").to.include(\"Program terminated when maximum step limit -1 reached.\"));",
                   "pm.test(\"Java exception stays in stderr\", () => pm.expect(body.stderr || \"\").to.include(\"Exception in thread\"));",
-                  "pm.test(\"no state asset\", () => pm.expect((body.assets || []).find((a) => a.logical_name === \"mars-state.txt\")).to.be.undefined);"
+                  "pm.test(\"state asset\", () => { const asset = (body.assets || []).find((a) => a.logical_name === \"mars-state.txt\"); pm.expect(asset).to.exist; pm.expect(asset.error).to.be.oneOf([null, undefined, \"\"]); pm.expect(asset.size_bytes).to.be.above(0); });"
                 ]
               }
             }

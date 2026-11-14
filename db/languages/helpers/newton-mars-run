@@ -1,5 +1,5 @@
 #!/usr/local/python-3.13.1/bin/python3
-"""Run MARS and capture its optional end-of-run state as a Judge0 asset."""
+"""Run MARS and capture its optional state and assembled text as assets."""
 
 import os
 import re
@@ -13,11 +13,23 @@ REGISTERS = (
 ).split()
 REGISTER_NUMBERS = {name.encode(): index for index, name in enumerate(REGISTERS)}
 STATE_LINE = re.compile(rb"^(?:\$[a-z][a-z0-9]*|Mem\[0x[0-9a-fA-F]+\])\t")
-MARS = [
-    "/usr/local/bin/java",
-    "-Djava.util.logging.config.file=/usr/local/mars/logging.properties",
-    "-jar",
-    "/usr/local/mars/mars.jar",
+MEMORY_RANGES = (
+    "0x10000000-0x100000fc",  # external data
+    "0x10040000-0x100400fc",  # heap
+    "0x7fffe800-0x7fffeffc",  # 2 KB near MARS's initial stack pointer
+    "0x90000000-0x900000fc",  # kernel data
+    "0xffff0000-0xffff00fc",  # MMIO
+)
+JAVA = "/usr/local/bin/java"
+MARS_JAR = "/usr/local/mars/mars.jar"
+JAVA_LOGGING = "-Djava.util.logging.config.file=/usr/local/mars/logging.properties"
+MARS = [JAVA, JAVA_LOGGING, "-jar", MARS_JAR, "nc"]
+MARS_WITH_LISTING = [
+    JAVA,
+    JAVA_LOGGING,
+    "-cp",
+    f"{MARS_JAR}:/usr/local/bin/newton-mars-listing.jar",
+    "Mars",
     "nc",
 ]
 
@@ -33,9 +45,31 @@ if not has_me:
     # Let bash observe Java's exit status and signals directly.
     os.execv(MARS[0], [*MARS, "main.s", *arguments])
 
+# Keep the playground's requested data range, or provide a default for other
+# callers. MARS prints each range after execution, so these are final values.
+pa_index = next(
+    (index for index, argument in enumerate(arguments) if argument.lower() == "pa"),
+    len(arguments),
+)
+memory_arguments = list(MEMORY_RANGES)
+if not any(argument.lower().startswith("0x10010000-") for argument in arguments[:pa_index]):
+    memory_arguments.insert(0, "0x10010000-0x100100fc")
+arguments[pa_index:pa_index] = memory_arguments
+
 # MARS sends the post-mortem dump and its error messages to stderr with `me`.
 # ae1/se1 make assembly and runtime failures nonzero instead of Accepted.
-command = [*MARS, "ae1", "se1", "main.s", *arguments]
+text_path = Path("mars-text.txt")
+command = [
+    *MARS_WITH_LISTING,
+    "ae1",
+    "se1",
+    "dump",
+    ".text",
+    "NewtonText",
+    str(text_path),
+    "main.s",
+    *arguments,
+]
 state_path = Path("mars-state.txt")
 state_file = None
 try:
@@ -64,5 +98,7 @@ finally:
         state_path.unlink(missing_ok=True)
     else:
         state_file.close()
+    if text_path.exists() and text_path.stat().st_size == 0:
+        text_path.unlink()
 
 sys.exit(returncode if returncode >= 0 else 128 - returncode)

@@ -114,9 +114,9 @@ WORKDIR /api
 COPY Gemfile* ./
 RUN RAILS_ENV=production bundle
 
-# Step 5: sandbox-side helpers for language 3001 (newton-mars-run) and 3010
-# (C + Lex/Yacc). They go to /usr/local/bin because isolate mounts /usr into
-# the sandbox but not /api.
+# Step 5: sandbox-side helpers for language 3001 (newton-mars-run and its
+# MARS text dump format) and 3010 (C + Lex/Yacc). They go to /usr/local/bin
+# because isolate mounts /usr into the sandbox but not /api.
 # The self-test builds and runs real flex/bison/GCC 9.5 programs, so this
 # layer REQUIRES compilers Tier 15 (flex, bison, libfl-dev, libbison-dev,
 # m4; image label 0.39+) and fails the build on an older compiler base BY
@@ -126,6 +126,12 @@ RUN RAILS_ENV=production bundle
 # below checks it is in db/languages/helpers/) is in the image too.
 COPY db/languages/helpers/ /usr/local/bin/
 RUN chmod 0755 /usr/local/bin/newton-* && \
+    mkdir -p /tmp/newton-mars-listing && \
+    javac -Xlint:-options --release 8 -cp /usr/local/mars/mars.jar \
+      -d /tmp/newton-mars-listing /usr/local/bin/NewtonTextDumpFormat.java && \
+    jar --create --file /usr/local/bin/newton-mars-listing.jar \
+      -C /tmp/newton-mars-listing . && \
+    rm -r /tmp/newton-mars-listing && \
     /usr/local/bin/newton-cdlab-selftest
 
 COPY cron /etc/cron.d

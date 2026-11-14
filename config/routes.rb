@@ -9,6 +9,7 @@ Rails.application.routes.draw do
     # in filenames (e.g. 'wave.vcd') without Rails treating them as
     # format separators.
     # See docs/superpowers/specs/2026-05-05-submission-assets-design.md.
+    get 'assets', to: 'submission_assets#index'
     get 'assets/:logical_name',
         to: 'submission_assets#show',
         constraints: { logical_name: %r{[^/]+} },
