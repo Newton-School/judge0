@@ -368,6 +368,9 @@ SRC_MIPS='        .data
 msg:    .asciiz "Hello, Newton!\n"
         .text
 main:
+        li      $t3, 1
+        addi    $sp, $sp, -4
+        addi    $sp, $sp, 4
         li      $v0, 4
         la      $a0, msg
         syscall
@@ -915,7 +918,7 @@ section "Newton extras"
 t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
 t_mips_case "MIPS 3001 with state and text" "$SRC_MIPS" \
     "me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c" \
-    "Accepted" "$EXPECTED" "" "yes" '$0 ($zero)' "exact" "0x24020004"
+    "Accepted" "$EXPECTED" "" "yes" '$0 ($zero)' "exact" $'0x23bdfffc\taddi $29,$29,0xfffffffc'
 t_mips_case "MIPS runtime error with ME (3001)" "$SRC_MIPS_RUNTIME_ERROR" \
     "ME dec t0 t1" "Runtime Error (NZEC)" "" "Runtime exception" "yes" $'$8 ($t0)\t1'
 t_mips_case "MIPS assembly error with me (3001)" "$SRC_MIPS_ASSEMBLY_ERROR" \

@@ -20,11 +20,16 @@ MEMORY_RANGES = (
     "0x90000000-0x900000fc",  # kernel data
     "0xffff0000-0xffff00fc",  # MMIO
 )
-MARS = [
-    "/usr/local/bin/java",
-    "-Djava.util.logging.config.file=/usr/local/mars/logging.properties",
-    "-jar",
-    "/usr/local/mars/mars.jar",
+JAVA = "/usr/local/bin/java"
+MARS_JAR = "/usr/local/mars/mars.jar"
+JAVA_LOGGING = "-Djava.util.logging.config.file=/usr/local/mars/logging.properties"
+MARS = [JAVA, JAVA_LOGGING, "-jar", MARS_JAR, "nc"]
+MARS_WITH_LISTING = [
+    JAVA,
+    JAVA_LOGGING,
+    "-cp",
+    f"{MARS_JAR}:/usr/local/bin/newton-mars-listing.jar",
+    "Mars",
     "nc",
 ]
 
@@ -55,12 +60,12 @@ arguments[pa_index:pa_index] = memory_arguments
 # ae1/se1 make assembly and runtime failures nonzero instead of Accepted.
 text_path = Path("mars-text.txt")
 command = [
-    *MARS,
+    *MARS_WITH_LISTING,
     "ae1",
     "se1",
     "dump",
     ".text",
-    "SegmentWindow",
+    "NewtonText",
     str(text_path),
     "main.s",
     *arguments,

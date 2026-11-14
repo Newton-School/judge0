@@ -161,9 +161,12 @@ language ids exist and what they invoke. Editing it requires a
 - **MIPS Mars 4.5 id 3001.** A caller that includes `me` in
   `command_line_arguments` opts into `mars-state.txt` and `mars-text.txt`
   submission assets. `newton-mars-run` captures the register and memory
-  dump, adds bounded windows for Data, External Data, Heap, Stack, Kernel
-  Data, and MMIO, and uses MARS's `SegmentWindow` dump for assembled Address,
-  Code, Basic, and Source columns. The Stack window covers the 2 KB below
+  dump and adds bounded windows for Data, External Data, Heap, Stack, Kernel
+  Data, and MMIO. A Java dump format built in `NewtonDockerfile` reads MARS's
+  `ProgramStatement` values and writes `mars-text.txt` as tab-separated
+  Address, Code, full Basic, source line number, and Source fields. MARS's
+  `SegmentWindow` format truncates Basic at 22 characters and must not be used
+  for this asset. The Stack window covers the 2 KB below
   MARS's initial `$sp`, keeping hexadecimal dumps within the local 20 KB asset
   cap. It keeps MARS errors on stderr. With `me`, it also supplies
   `ae1 se1`, so assembly and runtime errors return Runtime Error (NZEC)
@@ -176,10 +179,17 @@ language ids exist and what they invoke. Editing it requires a
     word values, and a trailing tab. The first row starts at the requested
     start address, not a 16-byte boundary; each later row starts 16 bytes
     after the previous one. The final row may contain fewer than four words.
+  - Text row: `<address><TAB><code><TAB><full basic><TAB><source line><TAB><source>`.
+    Source line and source are empty for generated instructions with no source.
 
   No asset is returned without `me` or after an assembly error. The lane
   declares a 40,960-byte `max_size` for each asset; `MAX_MAX_ASSET_SIZE`
-  can lower the effective cap. Callers that do not need the snapshot (for
+  can lower the effective cap. Production also caps assets at 40,960 bytes.
+  A large assembled listing can exceed that cap and make `mars-text.txt`
+  unavailable while `mars-state.txt` remains available. The tab-separated
+  listing is smaller than the old padded dump; callers should still handle
+  a missing text asset. Existing padded text assets must be rerun to get full
+  Basic instructions. Callers that do not need the snapshot (for
   example hidden test cases) should send no `command_line_arguments` and set
   `skip_assets: true`. With `me`, MARS does not append its usual final
   blank line to stdout. The helper restores MARS's step-limit notice to
@@ -246,7 +256,7 @@ language ids exist and what they invoke. Editing it requires a
 ## Build commands
 
 ```bash
-# arm64 (Mac dev)
+# arm64 (Mac dev, once the pinned compiler base has an arm64 image)
 docker buildx build --platform linux/arm64 \
   -f NewtonDockerfile -t newtonschool/newton-judge0:0.76 --load .
 
@@ -257,11 +267,14 @@ docker buildx build --platform linux/amd64 \
 
 A full build takes ~15-20 min (most of it is OpenSSL 1.1 + Ruby 2.7.8
 from source; the rest is bundle install).
+The pinned 0.41 compiler base currently has only an amd64 image. For MIPS-only
+local validation on arm64, an arm64 Tier 15 base can be substituted in a
+temporary Dockerfile; the available 0.39 base lacks 3011's ESP32-S3 support.
 
 ## Dev workflow
 
-Build the image first (see Build commands above; re-run only when
-`Gemfile` or `NewtonDockerfile` changes). Then bring up the stack —
+Build the image first (see Build commands above; re-run when `Gemfile`,
+`NewtonDockerfile`, or `db/languages/helpers/` changes). Then bring up the stack —
 `docker-compose.dev.yml` includes nginx and resque-web images that are
 old and may not start on current Docker Desktop, so skip those:
 
