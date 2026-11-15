@@ -13,6 +13,7 @@ REGISTERS = (
 ).split()
 REGISTER_NUMBERS = {name.encode(): index for index, name in enumerate(REGISTERS)}
 STATE_LINE = re.compile(rb"^(?:\$[a-z][a-z0-9]*|Mem\[0x[0-9a-fA-F]+\])\t")
+EMPTY_TEXT_SEGMENT_NOTICE = b"This segment has not been written to, there is nothing to dump."
 MEMORY_RANGES = (
     "0x10000000-0x100000fc",  # external data
     "0x10040000-0x100400fc",  # heap
@@ -89,6 +90,9 @@ try:
                 # `me` moves this MARS notice to stderr; the old lane showed it on stdout.
                 sys.stdout.buffer.write(b"\n" + line + b"\n")
                 sys.stdout.buffer.flush()
+            elif line.rstrip(b"\r\n") == EMPTY_TEXT_SEGMENT_NOTICE:
+                # An assembly error leaves .text empty; this dump notice is not a program error.
+                pass
             elif line.strip():
                 sys.stderr.buffer.write(line)
                 sys.stderr.buffer.flush()

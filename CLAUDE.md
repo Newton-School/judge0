@@ -181,9 +181,11 @@ language ids exist and what they invoke. Editing it requires a
     after the previous one. The final row may contain fewer than four words.
   - Text row: `<address><TAB><code><TAB><full basic><TAB><source line><TAB><source>`.
     Source line and source are empty for generated instructions with no source.
+    Tabs in Basic and Source become spaces so each row has exactly five fields.
 
-  No asset is returned without `me` or after an assembly error. The lane
-  declares a 40,960-byte `max_size` for each asset; `MAX_MAX_ASSET_SIZE`
+  No asset is returned without `me` or after an assembly error. The wrapper
+  omits MARS's empty-text-segment dump notice from assembly-error stderr.
+  The lane declares a 40,960-byte `max_size` for each asset; `MAX_MAX_ASSET_SIZE`
   can lower the effective cap. Production also caps assets at 40,960 bytes.
   A large assembled listing can exceed that cap and make `mars-text.txt`
   unavailable while `mars-state.txt` remains available. The tab-separated

@@ -200,12 +200,12 @@ t_ce() {
     fi
 }
 
-# t_mips_case <name> <source> <arguments> <status> <stdout> <stderr_substring> <asset: yes|no> [<state_substring>] [<stdout_mode>] [<text_substring>]
+# t_mips_case <name> <source> <arguments> <status> <stdout> <stderr> <asset: yes|no> [<state_substring>] [<stdout_mode>] [<text_substring>] [<stderr_mode: contains|exact>]
 # MARS has no compile step, so both assembly and runtime failures are NZEC.
 t_mips_case() {
     local name="$1" src="$2" args="$3" expected_status="$4"
     local expected_stdout="$5" expected_stderr="$6" expected_asset="$7" expected_state="${8:-}"
-    local stdout_mode="${9:-exact}" expected_text="${10:-}"
+    local stdout_mode="${9:-exact}" expected_text="${10:-}" stderr_mode="${11:-contains}"
     local payload resp status stdout stderr token asset state_text text_asset text_body files
     local run_ok=1 asset_ok=1
     payload="$(jq -nc --arg sc "$src" --arg args "$args" \
@@ -224,7 +224,11 @@ t_mips_case() {
         [[ "$stdout" == "$expected_stdout" ]] || run_ok=0
     fi
     if [[ -n "$expected_stderr" ]]; then
-        [[ "$stderr" == *"$expected_stderr"* ]] || run_ok=0
+        if [[ "$stderr_mode" == "exact" ]]; then
+            [[ "$stderr" == "$expected_stderr" ]] || run_ok=0
+        else
+            [[ "$stderr" == *"$expected_stderr"* ]] || run_ok=0
+        fi
     else
         [[ -z "$stderr" ]] || run_ok=0
     fi
@@ -368,7 +372,7 @@ SRC_MIPS='        .data
 msg:    .asciiz "Hello, Newton!\n"
         .text
 main:
-        li      $t3, 1
+	li $t3, 1
         addi    $sp, $sp, -4
         addi    $sp, $sp, 4
         li      $v0, 4
@@ -918,11 +922,13 @@ section "Newton extras"
 t "MIPS Mars 4.5 (3001)"        3001 "$SRC_MIPS"
 t_mips_case "MIPS 3001 with state and text" "$SRC_MIPS" \
     "me dec zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 0x10010000-0x1001003c" \
-    "Accepted" "$EXPECTED" "" "yes" '$0 ($zero)' "exact" $'0x23bdfffc\taddi $29,$29,0xfffffffc'
+    "Accepted" "$EXPECTED" "" "yes" '$0 ($zero)' "exact" $'0x240b0001\taddiu $11,$0,0x00000001\t5\t li $t3, 1'
 t_mips_case "MIPS runtime error with ME (3001)" "$SRC_MIPS_RUNTIME_ERROR" \
     "ME dec t0 t1" "Runtime Error (NZEC)" "" "Runtime exception" "yes" $'$8 ($t0)\t1'
 t_mips_case "MIPS assembly error with me (3001)" "$SRC_MIPS_ASSEMBLY_ERROR" \
-    "me" "Runtime Error (NZEC)" "" "Error in" "no"
+    "me" "Runtime Error (NZEC)" "" \
+    $'Error in /box/main.s line 3 column 9: "not_an_instruction" is not a recognized operator\nProcessing terminated due to errors.' \
+    "no" "" "exact" "" "exact"
 t_mips_case "MIPS me with pa arguments (3001)" "$SRC_MIPS_ARGC" \
     "me t0 pa x y" "Accepted" "2" "" "yes" '$8 ($t0)'
 t_mips_case "MIPS empty stdin retains step-limit notice (3001)" "$SRC_MIPS_READ_INT" \

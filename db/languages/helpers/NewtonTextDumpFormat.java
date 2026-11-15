@@ -40,7 +40,7 @@ public final class NewtonTextDumpFormat extends AbstractDumpFormat {
                 }
                 writer.write('\t');
                 if (source != null) {
-                    writer.write(source);
+                    writer.write(source.replace('\t', ' '));
                 }
                 writer.newLine();
             }
